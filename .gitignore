@@ -1,10 +1,12 @@
 # Ignore these folders
 
-771_workspace.code-workspace
+*.code-workspace
 
 *.vscode
 
 # Byte-compiled / optimized / DLL files
+
+.ipynb_checkpoints/
 
 __pycache__/
 
