@@ -26,7 +26,7 @@ def write_motion_file(grf_complete: np.ndarray, file_path: str):
 	fid.write("inDegrees=yes\n")
 	fid.write("endheader\n\n")
 
-	# [time vector1 point1 vector2 point2 torque1 torque2]
+	# headers
 	fid.write("time\tground_force_vx\tground_force_vy\tground_force_vz\tground_force_px\tground_force_py\tground_force_pz\t")
 	fid.write("ground_torque_x\tground_torque_y\tground_torque_z\n")
 

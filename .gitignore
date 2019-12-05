@@ -4,6 +4,9 @@
 
 *.vscode
 
+Python_OpenSim/
+Gait2354_Simbody/
+
 # Byte-compiled / optimized / DLL files
 
 .ipynb_checkpoints/

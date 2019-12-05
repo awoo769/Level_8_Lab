@@ -1,0 +1,22 @@
+Installing the OpenSim API for use with Python 3
+
+From https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python#ScriptinginPython-InstallingAnacondaandthe"opensim"Pythonpackage
+
+"Note on Python 2.7.x vs Python 3
+	The Python package that comes with the OpenSim GUI distribution will only work with Python 2.7.x. For Python 3, you must build the OpenSim API (opensim-core) from scratch and set the CMake variable OPENSIM_PYTHON_VERSION to 3."
+	
+	
+Therefore we must build the OpenSim API from scratch: https://github.com/opensim-org/opensim-core
+	Requirements (for Windows)
+	SWIG: http://www.swig.org/download.html
+	Operating system: Windows 7, 8, or 10
+	Cross-platform build system: CMake-gui (https://cmake.org/download/)
+	Complier/IDE: Visual Studio (https://visualstudio.microsoft.com/downloads/)
+	Physics engine: Simbody >= 3.6
+	Python scripting: Anaconda
+	
+Follow instructions from above link. When setting path to the environment(last step), do not put the ';' after C:/opensim-core/bin
+
+Copy the 'opensim' folder, in C:/opensim-core/stk/Python into C:/Users/####/Anaconda3/Lib/site-packages
+
+Test by running: "import opensim" in Spyder or any other Python platform

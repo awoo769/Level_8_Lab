@@ -13,7 +13,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 
-def read_trc():
+def read_trc(*file_path: str):
 	"""
 	Create a class of a TRC marker data file 
 
@@ -51,12 +51,18 @@ def read_trc():
 	
 	Example: trcContents = trcRead()
 
-	"""
+	"""	
 
-	root = tk.Tk()
-	root.withdraw()
+	# If optional argument is given, don't find filepath, if not, then do
+	if len(file_path) == 0:
+		root = tk.Tk()
+		root.withdraw()
 
-	file_path = filedialog.askopenfilename(initialdir = "r",title = "Select file",filetypes = (("trc files","*.trc"),("all files","*.*")))
+		file_path = filedialog.askopenfilename(initialdir = "r",title = "Select file",filetypes = (("trc files","*.trc"),("all files","*.*")))
+
+	else:
+		# Convert file path tuple to string
+		file_path = str(file_path[0])
 
 	# Split into file_name and path_name
 
@@ -138,7 +144,16 @@ def read_trc():
 	time = []
 	marker_data = []
 
-	for line in trc_lines[6:]:
+	# Line 6 in the trc file is often a '\n', but sometimes the new line is not there, so check
+	trc_line_6 = trc_lines[5]
+
+	if trc_line_6 == '\n':
+		start = 6 # Start on line 7
+
+	else:
+		start = 5 # Start on line 6
+
+	for line in trc_lines[start:]:
 		frame_numbers.append(np.uint32(int(line.split('\t')[0]))) # Get frame number (integer)
 		time.append(np.float32(line.split('\t')[1]))
 		marker_data.append(np.float64(line.rsplit('\t')[2:]))
