@@ -106,6 +106,23 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 		steps = ['l', 'r']
 		plates = [1, 2]
 
+	# Create time range
+	time_range = []
+
+# TODO find index of value, not the value
+	time_range.append(round(max(time[0], 0) + 0.020, 3))
+	time_range.append(time[-1])
+
+	index_start = time[time == time_range[0]]
+	index_end = time[time == time_range[1]]
+
+	# Create frame range
+	frame_range = []
+	
+	frame_range.append(frames[index_start]) 
+	frame_range.append(frames[index_end])
+
+
 	a = 1
 
 # Let the user select the input and output directory folders in Jupyter notebook
