@@ -195,7 +195,7 @@ def read_trc(*file_path: str):
 
 	trcContents["Data"]["Markers"] = {}
 
-	for i in range(1,num_markers):
+	for i in range(1,num_markers+1):
 	
 		trcContents["Data"]["Markers"][mod_marker_labels[i-1]] = {}
 		trcContents["Data"]["Markers"][mod_marker_labels[i-1]]["X"] = marker_data[:,i*3 - 3]
