@@ -46,11 +46,11 @@ def change_IK_xmlfile(ik_filename: str, trial: str, model: str, directory: str, 
 	input_directory_child.firstChild.data = ".\\"
 
 	# OpenSim model name
-	model_file_name = directory + "\\" + model + "\\" + trial + "\\" + model + ".osim"
+	model_file_name = model + ".osim"
 	model_file_child.firstChild.data = model_file_name
 	
 	# Hardcore input trc
-	marker_file_name = directory + "\\" + model + "\\" + trial + "\\" + trial + ".trc"
+	marker_file_name = trial + ".trc"
 	marker_file_child.firstChild.data = marker_file_name
 
 	# Plain output name (for local results)

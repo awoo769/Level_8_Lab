@@ -16,6 +16,8 @@ from write_motion_file import write_motion_file
 from change_ID_xmlfile import change_ID_xmlfile
 from xml_shorten import xml_shorten
 from change_load_xmlfile import change_load_xmlfile
+from change_muscle_analysis_xmlfile import change_muscle_analysis_xmlfile
+from change_muscle_force_direction_xmlfile import change_muscle_force_direction_xmlfile
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -280,8 +282,15 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	''' EMG Processing '''
 
-	
-	a = 1
+	''' Muscle Analysis Files '''
+
+	change_muscle_analysis_xmlfile(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_analysis_filename.split("\\")[-1]
+	xml_shorten(filename)
+
+	change_muscle_force_direction_xmlfile(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_force_direction_filename.split("\\")[-1]
+	xml_shorten(filename)
 
 # Let the user select the input and output directory folders in Jupyter notebook
 

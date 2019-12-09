@@ -9,7 +9,7 @@ def change_load_xmlfile(load_filename: str, trial: str, model: str, directory: s
 	'''
 
 	doc_node = minidom.parse(load_filename)
-	mot_string = directory + "\\" + model + "\\" + trial + "\\" + trial + ".mot"
+	mot_string = trial + ".mot"
 
 	''' Get Hierarchy Access '''
 	exL = doc_node.getElementsByTagName("ExternalLoads")
