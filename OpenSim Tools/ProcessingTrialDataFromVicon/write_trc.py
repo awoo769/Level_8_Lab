@@ -94,6 +94,6 @@ def write_trc(marker_labels: list, header_information: dict, frame_numbers: np.n
 	fid.close()
 
 	# Print new file name for the user
-	print(full_file_name)
+	print('New TRC location: %s\n' % (full_file_name))
 
 

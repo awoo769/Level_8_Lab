@@ -58,7 +58,8 @@ def change_IK_xmlfile(ik_filename: str, trial: str, model: str, directory: str, 
 	output_motion_file_child.firstChild.data = output_file_name
 
 	# Time range
-	timerange = ' '.join(list(map(str, time__range)))
+	timerange = list(map(str, time__range))
+
 	time_range_child.firstChild.data = timerange
 
 	''' Remove any absent markers, set weighting for bony landmarks (anatomical markers) '''
@@ -86,4 +87,4 @@ def change_IK_xmlfile(ik_filename: str, trial: str, model: str, directory: str, 
 	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + ik_filename.split("\\")[-1]
 
 	with open(new_filename, 'w') as xml_file:
-		doc_node.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')
+		doc_node.writexml(xml_file)

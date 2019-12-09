@@ -30,4 +30,4 @@ def rezero_filter(original_fy: np.ndarray):
 		filter_plate[true_inds,i] = 1
 		filter_plate[extra_inds,i] = 1
 
-		return filter_plate
+	return filter_plate

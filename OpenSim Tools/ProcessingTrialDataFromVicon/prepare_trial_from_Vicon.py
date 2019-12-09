@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 from scipy import signal
+import matplotlib.pyplot as plt
 
 from read_trc import read_trc
 from write_trc import write_trc
@@ -9,6 +10,12 @@ from read_mot import read_mot
 from trim_trc import trim_trc
 from remove_bad_markers import remove_bad_markers
 from change_IK_xmlfile import change_IK_xmlfile
+from rezero_filter import rezero_filter
+from fix_grf_headers import fix_grf_headers
+from write_motion_file import write_motion_file
+from change_ID_xmlfile import change_ID_xmlfile
+from xml_shorten import xml_shorten
+from change_load_xmlfile import change_load_xmlfile
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -99,6 +106,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	print(model)
 	print(trial)
+	print('\n')
 	
 	if not bad_EMG:
 		#TODO
@@ -126,7 +134,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	frame_range.append(frames[index_end])
 
 	''' IK file '''
-	'''
+	
 	trimmed_markers, trimmed_frames, trimmed_time = trim_trc(markers, frames, time, [int(index_start[0]), int(index_end[0])])
 
 	# Remove markers may not be needed, as conditioning done in Nexus
@@ -143,7 +151,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	# concatenate marker data with frame numbers and times
 	new_mkr_data = np.concatenate((trimmed_frames[:, np.newaxis], trimmed_time[:, np.newaxis], marker_data),axis=1)
 
-	new_filename = trc_filename = os.path.join(output_model_trial_dir, trial + "." + "trc")
+	new_filename = os.path.join(output_model_trial_dir, trial + "." + "trc")
 
 	# Edit mkr_data["Information"] for trimmed dataset
 	mkr_data["Information"]["NumFrames"] = len(trimmed_frames)
@@ -153,11 +161,9 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	# Note: this function edits the xml file. This is better done using the OpenSim APIs if you can
 	change_IK_xmlfile(IK_filename, trial, model, output_directory, time_range, good_marker_names, bad_marker_names)
-
-	#full_IK_filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split('\\')[-1]
-
-	# Shorten xml and move file TODO if needed at end
-	'''
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
+	xml_shorten(filename)
+	
 	''' ID files '''
 
 	# Define the grf capture rate
@@ -179,13 +185,104 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	for i in range(1,len(grf_headers)):
 		new_grf_data[:,i] = signal.filtfilt(b, a, full_grf_data[:,i], axis=0)
-	
+
 	# Re-zero grfs
-	force_zero = np.where(original_fy[:,1] < 20)
+	filter_plate = rezero_filter(original_fy)
+
+	# Re-zero all columns except those which refer to the centre of pressure
+	# Assumes that the only headers which contain 'p' are CoP
+
+	for i in range(1,len(grf_headers)): # Are not rezeroing time
+		# If not centre of pressure AND force plate 1
+		if ('p' not in grf_headers[i]) and ('1' in grf_headers[i]):
+			new_grf_data[:,i] = filter_plate[:,0] * new_grf_data[:,i]
+		# If not centre of pressure AND force plate 2
+		elif ('p' not in grf_headers[i]) and ('2' in grf_headers[i]):
+			new_grf_data[:,i] = filter_plate[:,1] * new_grf_data[:,i]
+
+	if recalculate_COP:
+		# Define for recalculating CoP - position of force plates
+		x_offset = [0.2385, 0.7275]
+		y_offset = [0, 0]
+
+		vz_inds = [i for i, s in enumerate(grf_headers) if 'vy' in s]
+		px_inds = [i for i, s in enumerate(grf_headers) if 'px' in s]
+		py_inds = [i for i, s in enumerate(grf_headers) if 'pz' in s] # OpenSim Coordinate frame
+
+		fZ = np.zeros(np.shape(filter_plate.T))
+		pX = np.zeros(np.shape(filter_plate.T))
+		pY = np.zeros(np.shape(filter_plate.T))
+		oldmY = np.zeros(np.shape(filter_plate.T))
+		oldmX = np.zeros(np.shape(filter_plate.T))
+
+		# Back calculate moment measurements
+		for i in range(len(plates)):
+			side_inds = [j for j, s in enumerate(grf_headers) if str(i+1) in s]
+
+			fZ[i,:] = full_grf_data[:,list(set(side_inds).intersection(vz_inds))].T
+			pX[i,:] = full_grf_data[:,list(set(side_inds).intersection(px_inds))].T
+			pY[i,:] = full_grf_data[:,list(set(side_inds).intersection(py_inds))].T
+
+			oldmX[i,:] = (y_offset[i] + pY[i,:]) * fZ[i,:]
+			oldmY[i,:] = (x_offset[i] - pX[i,:]) * fZ[i,:]
+
+		# Filter old moments
+		mX = signal.filtfilt(b, a, oldmX, axis=1)
+		mY = signal.filtfilt(b, a, oldmY, axis=1)
+
+		# Rezero moments
+		for i in range(len(plates)):
+			mX[i,:] = filter_plate[:,i].T * mX[i,:]
+			mY[i,:] = filter_plate[:,i].T * mY[i,:]
+
+		# Recalculate CoP with filtered forces and moments
+		new_pX = np.zeros(np.shape(pX))
+		new_pY = np.zeros(np.shape(pY))
+
+		for i in range(len(plates)):
+			side_inds = [j for j, s in enumerate(grf_headers) if str(i+1) in s]
+			new_fZ = new_grf_data[:, list(set(side_inds).intersection(vz_inds))]
+			
+			for j in range(len(mY[i,:])):
+				if new_fZ[j] != 0:
+					new_pX[i,j] = x_offset[i] - (mY[i,j] / new_fZ[j])
+					new_pY[i,j] = y_offset[i] + (mX[i,j] / new_fZ[j])
+				else:
+					new_pX[i,j] = 0
+					new_pY[i,j] = 0
+
+			new_grf_data[:, list(set(side_inds).intersection(px_inds))] = new_pX[i,:][:,np.newaxis]
+			new_grf_data[:, list(set(side_inds).intersection(py_inds))] = new_pY[i,:][:, np.newaxis]
+
+			plt.subplot(1,2,i+1)
+			plt.plot(pX[i,:], pY[i,:], '*')
+			plt.plot(new_pX[i,:], new_pY[i,:], 'x')
+
+			print('Just associated new CoP for plate %i' % (i+1))
+
+		plt.show()
+		print('\n')
+
+	grf_data = new_grf_data[int(np.where(np.float32(new_grf_data[:,0]) == time_range[0])[0]):int(np.where(np.float32(new_grf_data[:,0]) == time_range[-1])[0] + 1), :]
+
+	new_headers = fix_grf_headers(grf_headers, steps, plates)
 	
+	new_filename = os.path.join(output_model_trial_dir, trial + "." + "mot")
+	write_motion_file(grf_data, new_filename, new_headers)
+	
+	change_ID_xmlfile(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ID_filename.split("\\")[-1]
+	xml_shorten(filename)
 
+	change_load_xmlfile(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ex_loads_filename.split("\\")[-1]
+	xml_shorten(filename)
 
+	''' EMG Processing '''
+
+	
 	a = 1
+
 # Let the user select the input and output directory folders in Jupyter notebook
 
 # Put input directory and output directory as full file paths

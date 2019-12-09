@@ -1,4 +1,5 @@
-<?xml version="1.0" ?><OpenSimDocument Version="30000">
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSimDocument Version="30000">
 	<InverseKinematicsTool>
 		<!--Directory used for writing results.-->
 		<results_directory>.\</results_directory>
@@ -291,7 +292,7 @@
 		<!--The name of the storage (.sto or .mot) file containing coordinate observations.Coordinate values from this file are included if there is a corresponding coordinate task. -->
 		<coordinate_file>Unassigned</coordinate_file>
 		<!--Time range over which the inverse kinematics problem is solved.-->
-		<time_range>['15.3', '30.455']</time_range>
+		<time_range>15.3 30.455</time_range>
 		<!--Flag (true or false) indicating whether or not to report marker errors from the inverse kinematics solution.-->
 		<report_errors>true</report_errors>
 		<!--Name of the motion file (.mot) to which the results should be written.-->
