@@ -12,7 +12,6 @@ Therefore we must build the OpenSim API from scratch: https://github.com/opensim
 	Operating system: Windows 7, 8, or 10
 	Cross-platform build system: CMake-gui (https://cmake.org/download/)
 	Complier/IDE: Visual Studio (https://visualstudio.microsoft.com/downloads/)
-	Physics engine: Simbody >= 3.6
 	Python scripting: Anaconda
 	
 Follow instructions from above link. When setting path to the environment(last step), do not put the ';' after C:/opensim-core/bin

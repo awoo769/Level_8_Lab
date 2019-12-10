@@ -2,7 +2,7 @@ import numpy as np
 import opensim as osim
 from xml.dom import minidom
 
-def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_range: list, good_marker_names: list, bad_marker_names: list):
+def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_range: list, marker_names: list):
 	'''
 	Rewrites the IK setup xml file for a new trial
 
@@ -11,9 +11,7 @@ def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_
 			model: model name, e.g., "AB08"
 			directory: output directory name
 			time_range: start and end times
-			good_marker_names: list of the markers names which are safe to use
-			bad_marker_names: list of the markers which have problems (should be empty as data
-			is pre-processed in Nexus)
+			marker_names: list of the markers names which we are using
 
 	'''
 
@@ -53,7 +51,7 @@ def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_
 		current_marker = marker.getName()
 
 		# If the marker in the inverse kinematics tool is one which we are using
-		if (current_marker in good_marker_names) and (current_marker not in bad_marker_names):
+		if (current_marker in marker_names):
 			marker.setApply(True)
 		else:
 			marker.setApply(False)

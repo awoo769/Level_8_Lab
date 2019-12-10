@@ -28,6 +28,9 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	prepare_trial_from_Vicon: A function to condition and collate trial data and setup all 
 	necessary OpenSim analysis xmls.
 
+	Assumes data has been pre-processed in Nexus.
+	Assumes that in the input directory, there is (at least) a trc and mot file of the trial.
+
 	Inputs:		model = Name of subject, assuming model file is "Subject.osim"
 				trial = Name of motion capture trial
 				output_directory = Location of output
@@ -59,7 +62,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	if any(trial == s in s for s in bad_EMG_trials):
 		bad_EMG = 1 # Set bad_EMG flag to 1 (trial does not contain good EMG data)
 
-	# Identify files from Vicon export to read
+	# Identify files from Vicon/Nexus export to read
 	trc_filename = os.path.join(input_directory, trial + "." + "trc")
 	mot_filename = os.path.join(input_directory, trial + "." + "mot")
 	emg_filename = os.path.join(input_directory, trial + "_EMG." + "mot")
@@ -98,7 +101,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	muscle_force_direction_filename = os.path.join(xml_directory, "MuscleForceDirectionSetup.xml")
 	scale_filename = os.path.join(xml_directory, "ScaleSetup.xml")
 
-	setup_scale_xml(scale_filename, trial, model, output_directory, input_directory)
+	#setup_scale_xml(scale_filename, trial, model, output_directory, input_directory)
 
 	''' Pull in exported Vicon files, identify time range of interest '''
 	# Note: this approach differs with regard to available event data
@@ -169,7 +172,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	write_trc(good_marker_names, mkr_data["Information"], trimmed_frames, new_mkr_data, new_filename)
 
 	# Note: this function edits the xml file. This is better done using the OpenSim APIs if you can
-	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names, bad_marker_names)
+	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
 	xml_shorten(filename)
 	
@@ -214,9 +217,11 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 		x_offset = [0.2385, 0.7275]
 		y_offset = [0, 0]
 
+		# OpenSim Coordinate frame has y upwards. We will convert to x and y being the plane parallel
+		# the ground for convenience (will return to OpenSim coordinates when creating new grf data)
 		vz_inds = [i for i, s in enumerate(grf_headers) if 'vy' in s]
 		px_inds = [i for i, s in enumerate(grf_headers) if 'px' in s]
-		py_inds = [i for i, s in enumerate(grf_headers) if 'pz' in s] # OpenSim Coordinate frame
+		py_inds = [i for i, s in enumerate(grf_headers) if 'pz' in s]
 
 		fZ = np.zeros(np.shape(filter_plate.T))
 		pX = np.zeros(np.shape(filter_plate.T))
