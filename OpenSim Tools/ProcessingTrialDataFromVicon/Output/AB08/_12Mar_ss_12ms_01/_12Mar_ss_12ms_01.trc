@@ -1,4 +1,4 @@
-PathFileType	4	(X/Y/Z)	C:\Users\alexw\Dropbox\ABI\Level_8_Lab\OpenSim Tools\ProcessingTrialDataFromVicon\Output\AB08\_12Mar_ss_12ms_01\_12Mar_ss_12ms_01.trc
+PathFileType	4	(X/Y/Z)	_12Mar_ss_12ms_01.trc
 DataRate	CameraRate	NumFrames	NumMarkers	Units	OrigDataRate	OrigDataStartFrame	OrigNumFrames
 200.000000	200.000000	3032	42	mm	200.000000	3062	6093
 Frame#	Time	LASI			RASI			LPSI			RPSI			LTH1			LTH2			LTH3			LTH4			LMFC			LLFC			LTB1			LTB2			LTB3			LTB4			LMMAL			LLMAL			LCAL			LToe			LMT1			LMT5			RTH1			RTH2			RTH3			RTH4			RMFC			RLFC			RTB1			RTB2			RTB3			RTB4			RMMAL			RLMAL			RCAL			RToe			RMT1			RMT5			C7			T10			LACR1			RACR1			CLAV			RBack			

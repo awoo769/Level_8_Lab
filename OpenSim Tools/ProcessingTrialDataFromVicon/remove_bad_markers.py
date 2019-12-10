@@ -4,6 +4,13 @@ def remove_bad_markers(trimmed_markers: dict, marker_names: list):
 	'''
 	This function checks for gaps and duplicate markers, then removes them.
 
+	Inputs: trimmed_markers: a dictionary containing the markers and their data
+			marker_names: a list of the marker names
+
+	Outputs:	trimmed_markers: a dictionary of the good marker names and their data
+				marker_names: a list of the good marker names
+				bad_keys: a list of the bad marker names
+
 	'''
 
 	# Check for gaps

@@ -6,6 +6,13 @@ def change_muscle_force_direction_xmlfile(force_filename: str, trial: str, model
 	NOTE: Any attribute not changed within this function must be changed in the original template 
 	in "xmlTemplates"
 
+	Inputs:	force_filename: full filename for the template muscle force direction setup xml file
+			trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
+			model: model name, e.g., "AB08"
+			directory: output directory name
+			time_range: start and end times
+			cuf_off_frequency: low pass cut-off frequency
+
 	'''
 
 	doc_node = minidom.parse(force_filename)

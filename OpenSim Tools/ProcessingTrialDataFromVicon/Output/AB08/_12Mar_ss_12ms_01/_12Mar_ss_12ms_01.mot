@@ -1,11 +1,11 @@
-C:\Users\alexw\Dropbox\ABI\Level_8_Lab\OpenSim Tools\ProcessingTrialDataFromVicon\Output\AB08\_12Mar_ss_12ms_01\_12Mar_ss_12ms_01.mot
+_12Mar_ss_12ms_01.mot
 version=1
 nRows=15156
 nColumns=19
 inDegrees=yes
 endheader
 
-time	L_ground_force_vx	L_ground_force_vy	L_ground_force_vz	L_ground_force_px	L_ground_force_py	L_ground_force_pz	L_ground_torque_x	L_ground_torque_y	L_ground_torque_z	R_ground_force_vx	R_ground_force_vy	R_ground_force_vz	R_ground_force_px	R_ground_force_py	R_ground_force_pz	R_ground_torque_x	R_ground_torque_y	R_ground_torque_z
+time	ground_force_vx	ground_force_vy	ground_force_vz	ground_force_px	ground_force_py	ground_force_pz	ground_torque_x	ground_torque_y	ground_torque_z	1_ground_force_vx	1_ground_force_vy	1_ground_force_vz	1_ground_force_px	1_ground_force_py	1_ground_force_pz	1_ground_torque_x	1_ground_torque_y	1_ground_torque_z
 	15.300000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-46.095740	634.396742	3.719764	0.572903	0.000000	-0.901986	0.000033	-15.714630	0.000009
 15.301000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-46.009806	634.915157	3.140926	0.572948	0.000000	-0.900806	0.000033	-15.729182	0.000010
 15.302000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-45.927245	635.461363	2.560292	0.572993	0.000000	-0.899620	0.000032	-15.744938	0.000011

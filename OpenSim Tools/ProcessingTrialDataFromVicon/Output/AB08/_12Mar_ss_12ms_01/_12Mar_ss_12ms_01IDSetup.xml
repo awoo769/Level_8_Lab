@@ -1,5 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<OpenSimDocument Version="30000">
+<?xml version="1.0" encoding="UTF-8" ?>
+<OpenSimDocument Version="40000">
 	<InverseDynamicsTool name="AB08">
 		<!--Directory used for writing results.-->
 		<results_directory>.\</results_directory>
@@ -8,8 +8,8 @@
 		<!--Name of the .osim file used to construct a model.-->
 		<model_file>AB08.osim</model_file>
 		<!--Time range over which the inverse dynamics problem is solved.-->
-		<time_range>15.3 30.455</time_range>
-		<!--List of forces by individual or grouping name (e.g. All, actuators, muscles, ...) to be excluded when computing model dynamics.-->
+		<time_range> 15.3 30.455</time_range>
+		<!--List of forces by individual or grouping name (e.g. All, actuators, muscles, ...) to be excluded when computing model dynamics. 'All' also excludes external loads added via 'external_loads_file'.-->
 		<forces_to_exclude> Muscles</forces_to_exclude>
 		<!--XML file (.xml) containing the external loads applied to the model as a set of ExternalForce(s).-->
 		<external_loads_file>_12Mar_ss_12ms_01ExternalLoads.xml</external_loads_file>
@@ -20,7 +20,7 @@
 		<!--Name of the storage file (.sto) to which the generalized forces are written.-->
 		<output_gen_force_file>_12Mar_ss_12ms_01IDResults.sto</output_gen_force_file>
 		<!--List of joints (keyword All, for all joints) to report body forces acting at the joint frame expressed in ground.-->
-		<joints_to_report_body_forces/>
+		<joints_to_report_body_forces />
 		<!--Name of the storage file (.sto) to which the body forces at specified joints are written.-->
 		<output_body_forces_file>body_forces_at_joints.sto</output_body_forces_file>
 	</InverseDynamicsTool>

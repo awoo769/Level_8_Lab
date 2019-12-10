@@ -3,6 +3,17 @@ import numpy as np
 
 def read_mot(data_start: int, *file_path: str):
 
+	'''
+	Reads a motion file
+
+	Inputs: data_start: first line which contains data in the .mot file
+			file_path: optional arguement, containing the full path to the .mot file
+
+	Outputs:	mot_headers: a list of the motion data file headers
+				data: the data from the motion file 
+
+	'''
+
 	# If optional argument is given, don't find filepath, if not, then do
 	if len(file_path) == 0:
 		file_path = filedialog.askopenfilename(initialdir = "r",title = "Select file",filetypes = (("mot files","*.mot"),("all files","*.*")))
@@ -32,7 +43,5 @@ def read_mot(data_start: int, *file_path: str):
 
 	# Convert to array of floats
 	data = np.array(data)
-
-
 
 	return mot_headers, data

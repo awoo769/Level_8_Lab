@@ -5,6 +5,11 @@ def rezero_filter(original_fy: np.ndarray):
 	'''
 	Resets all values which were originally zero to zero
 
+	Inputs:	original_fy: an array of unfiltered y data
+
+	Outputs:	filter_plate: an array corresponding to a mask. '1' if above a threshold to keep,
+				'0' if below a threshold and will be set to 0
+
 	'''
 
 	filter_plate = np.zeros(np.shape(original_fy))

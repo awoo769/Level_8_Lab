@@ -9,15 +9,16 @@ from write_trc import write_trc
 from read_mot import read_mot
 from trim_trc import trim_trc
 from remove_bad_markers import remove_bad_markers
-from change_IK_xmlfile import change_IK_xmlfile
 from rezero_filter import rezero_filter
 from fix_grf_headers import fix_grf_headers
 from write_motion_file import write_motion_file
-from change_ID_xmlfile import change_ID_xmlfile
 from xml_shorten import xml_shorten
-from change_load_xmlfile import change_load_xmlfile
 from change_muscle_analysis_xmlfile import change_muscle_analysis_xmlfile
 from change_muscle_force_direction_xmlfile import change_muscle_force_direction_xmlfile
+
+from change_IK_xmlfile import change_IK_xmlfile
+from change_ID_xmlfile import change_ID_xmlfile
+from change_load_xmlfile import change_load_xmlfile
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -282,6 +283,8 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	''' EMG Processing '''
 
+	# TODO
+
 	''' Muscle Analysis Files '''
 
 	change_muscle_analysis_xmlfile(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
@@ -298,7 +301,6 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 output_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\Output"
 input_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\InputDirectory"
 xml_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\xmlTemplates"
-
 
 prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
 

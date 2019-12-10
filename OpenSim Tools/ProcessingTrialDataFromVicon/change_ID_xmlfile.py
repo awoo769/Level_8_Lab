@@ -1,71 +1,57 @@
 import numpy as np
-from xml.dom import minidom
+import opensim as osim
 
-def change_ID_xmlfile(id_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
+def change_ID_xmlfile(id_filename: str, trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
 	'''
 	Rewrites the ID setup xml file for a new trial
 
+	Inputs:	id_filename: full filename for the template inverse dynamics setup xml file
+			trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
+			model: model name, e.g., "AB08"
+			directory: output directory name
+			time_range: start and end times
+			cuf_off_frequency: low pass cut-off frequency
+
 	'''
 
-	doc_node = minidom.parse(id_filename)
+	# Create an instance of the inverse dynamics tool
+	ID_tool = osim.InverseDynamicsTool(id_filename)
 
-	''' Get Hierarchy Access '''
-	ID_tool = doc_node.getElementsByTagName("InverseDynamicsTool")
-	ID_tool_child = ID_tool.item(0)
+	# Set name
+	ID_tool.setName(model)
 
-	res_directory = ID_tool_child.getElementsByTagName("results_directory")
-	res_directory_child = res_directory.item(0)
+	# Set the opensim model name
+	ID_tool.setModelFileName(model + ".osim")
 
-	input_directory = ID_tool_child.getElementsByTagName("input_directory")
-	input_directory_child = input_directory.item(0)
+	# Set excluded forces
+	excluded_forces = osim.ArrayStr()
+	excluded_forces.setitem(0,'Muscles')
+	ID_tool.setExcludedForces(excluded_forces)
 
-	model_file = ID_tool_child.getElementsByTagName("model_file")
-	model_file_child = model_file.item(0)
+	# Set low pass cut-off frequency, NOTE: Must be a double (np.float64)
+	ID_tool.setLowpassCutoffFrequency(np.float64(cut_off_freq))
 
-	time_range = ID_tool_child.getElementsByTagName("time_range")
-	time_range_child = time_range.item(0)
+	# Set the input and results directory
+	ID_tool.setResultsDir(".\\")
+	ID_tool.setInputsDir(".\\")
 
-	ex_loads_file = ID_tool_child.getElementsByTagName("external_loads_file")
-	ex_loads_file_child = ex_loads_file.item(0)
+	# Set the time range, NOTE: Must be a double (np.float64)
+	ID_tool.setStartTime(np.float64(time_range[0]))
+	ID_tool.setEndTime(np.float64(time_range[-1]))
 
-	coords_file = ID_tool_child.getElementsByTagName("coordinates_file")
-	coords_file_child = coords_file.item(0)
-
-	filter_frequency = ID_tool_child.getElementsByTagName("lowpass_cutoff_frequency_for_coordinates")
-	filter_frequency_child = filter_frequency.item(0)
-
-	output_gen_force_file = ID_tool_child.getElementsByTagName("output_gen_force_file")
-	output_gen_force_file_child = output_gen_force_file.item(0)
-
-	''' Set new directory, filenames, and number inputs '''
-
-	ID_tool_child.setAttribute('name', model)
-
-	# Local directory
-	res_directory_child.firstChild.data = ".\\"
-	input_directory_child.firstChild.data = ".\\"
-
-	# OpenSim model name
-	model_file_name = model + ".osim"
-	model_file_child.firstChild.data = model_file_name
-	
-	# Time range
-	timerange = ' '.join(list(map(str, time__range)))
-	time_range_child.firstChild.data = timerange
-
+	# Set the external loads file
 	external_loads_file = trial + 'ExternalLoads.xml'
-	ex_loads_file_child.firstChild.data = external_loads_file
+	ID_tool.setExternalLoadsFileName(external_loads_file)
 
-	coordsfile = trial + 'IKResults.mot'
-	coords_file_child.firstChild.data = coordsfile
+	# Set the coordinates file
+	coordindate_file = trial + 'IKResults.mot'
+	ID_tool.setCoordinatesFileName(coordindate_file)
 
-	filter_frequency_child.firstChild.data = str(cut_off_freq)
-
-	# Plain output name (for local results)
+	# Set the output file
 	output_file_name = trial + "IDResults.sto"
-	output_gen_force_file_child.firstChild.data = output_file_name
+	ID_tool.setOutputGenForceFileName(output_file_name)
 	
-	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + id_filename.split("\\")[-1]
+	''' Write changes to an XML setup file '''
 
-	with open(new_filename, 'w') as xml_file:
-		doc_node.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')
+	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + id_filename.split("\\")[-1]
+	ID_tool.printToXML(xml_setup_path)

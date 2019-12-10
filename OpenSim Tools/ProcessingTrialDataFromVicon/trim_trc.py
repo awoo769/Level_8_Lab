@@ -4,6 +4,15 @@ def trim_trc(old_markers: dict, old_frames: np.ndarray, old_times: np.ndarray, i
 	'''
 	Trims markers, frames, and times from a trc to within the start and end indices within inds
 
+	Inputs:	old_markers: a dictionary of the original markers and their data
+			old_frames: an array of the old frame numbers
+			old_times: an array of the old times
+			inds: a list of the indices to trim to [start, end]
+
+	Outputs:	new_markers: a dictionary and their data containing the newly trimmed set
+				new_frames: an array of the trimmed frame numbers
+				new_time: an array of the trimmed times
+
 	'''
 	
 	# Create new dictionary for markers

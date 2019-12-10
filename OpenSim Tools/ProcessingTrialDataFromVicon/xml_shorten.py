@@ -3,6 +3,8 @@ import re
 def xml_shorten(file_path):
 	'''
 	Removes extra lines created within the xml document
+
+	Inputs: file_path: the full file path to be opened
 	
 	'''
 
