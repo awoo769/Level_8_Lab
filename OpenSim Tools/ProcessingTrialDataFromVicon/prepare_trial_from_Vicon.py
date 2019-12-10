@@ -21,6 +21,7 @@ from setup_muscle_force_direction_xml import setup_muscle_force_direction_xml
 from setup_ID_xml import setup_ID_xml
 from setup_IK_xml import setup_IK_xml
 from setup_load_xml import setup_load_xml
+from setup_scale_xml import setup_scale_xml
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -95,6 +96,9 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	ex_loads_filename = os.path.join(xml_directory, "ExternalLoads.xml")
 	muscle_analysis_filename = os.path.join(xml_directory, "MuscleAnalysisSetup.xml")
 	muscle_force_direction_filename = os.path.join(xml_directory, "MuscleForceDirectionSetup.xml")
+	scale_filename = os.path.join(xml_directory, "ScaleSetup.xml")
+
+	setup_scale_xml(scale_filename, trial, model, output_directory, input_directory)
 
 	''' Pull in exported Vicon files, identify time range of interest '''
 	# Note: this approach differs with regard to available event data
