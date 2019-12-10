@@ -13,12 +13,14 @@ from rezero_filter import rezero_filter
 from fix_grf_headers import fix_grf_headers
 from write_motion_file import write_motion_file
 from xml_shorten import xml_shorten
-from change_muscle_analysis_xmlfile import change_muscle_analysis_xmlfile
-from change_muscle_force_direction_xmlfile import change_muscle_force_direction_xmlfile
 
-from change_IK_xmlfile import change_IK_xmlfile
-from change_ID_xmlfile import change_ID_xmlfile
-from change_load_xmlfile import change_load_xmlfile
+from setup_muscle_analysis_xml import setup_muscle_analysis_xml
+from setup_muscle_force_direction_xml import setup_muscle_force_direction_xml
+
+# OpenSim API
+from setup_ID_xml import setup_ID_xml
+from setup_IK_xml import setup_IK_xml
+from setup_load_xml import setup_load_xml
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -163,7 +165,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	write_trc(good_marker_names, mkr_data["Information"], trimmed_frames, new_mkr_data, new_filename)
 
 	# Note: this function edits the xml file. This is better done using the OpenSim APIs if you can
-	change_IK_xmlfile(IK_filename, trial, model, output_directory, time_range, good_marker_names, bad_marker_names)
+	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names, bad_marker_names)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
 	xml_shorten(filename)
 	
@@ -273,11 +275,11 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	new_filename = os.path.join(output_model_trial_dir, trial + "." + "mot")
 	write_motion_file(grf_data, new_filename, new_headers)
 	
-	change_ID_xmlfile(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	setup_ID_xml(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ID_filename.split("\\")[-1]
 	xml_shorten(filename)
 
-	change_load_xmlfile(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
+	setup_load_xml(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ex_loads_filename.split("\\")[-1]
 	xml_shorten(filename)
 
@@ -287,11 +289,11 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	''' Muscle Analysis Files '''
 
-	change_muscle_analysis_xmlfile(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	setup_muscle_analysis_xml(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_analysis_filename.split("\\")[-1]
 	xml_shorten(filename)
 
-	change_muscle_force_direction_xmlfile(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	setup_muscle_force_direction_xml(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_force_direction_filename.split("\\")[-1]
 	xml_shorten(filename)
 

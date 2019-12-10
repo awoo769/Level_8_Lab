@@ -1,7 +1,7 @@
 import numpy as np
 import opensim as osim
 
-def change_load_xmlfile(load_filename: str, trial: str, model: str, directory: str, cut_off_freq: np.float64):
+def setup_load_xml(load_filename: str, trial: str, model: str, directory: str, cut_off_freq: np.float64):
 	'''
 	Takes the external loads xml file specified by load_filename, and sets the .mot files to those specified
 	by trial, and writes to a new file of the two strings combined, i.e., "Walk1ExternalLoads.xml"

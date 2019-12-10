@@ -1,7 +1,7 @@
 import numpy as np
 from xml.dom import minidom
 
-def change_muscle_force_direction_xmlfile(force_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
+def setup_muscle_force_direction_xml(force_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
 	'''
 	NOTE: Any attribute not changed within this function must be changed in the original template 
 	in "xmlTemplates"

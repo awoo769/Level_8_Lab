@@ -1,7 +1,7 @@
 import numpy as np
 from xml.dom import minidom
 
-def change_muscle_analysis_xmlfile(muscle_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
+def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
 	'''
 	NOTE: Any attribute not changed within this function must be changed in the original template 
 	file 

@@ -1,7 +1,7 @@
 import numpy as np
 import opensim as osim
 
-def change_ID_xmlfile(id_filename: str, trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
+def setup_ID_xml(id_filename: str, trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
 	'''
 	Rewrites the ID setup xml file for a new trial
 
