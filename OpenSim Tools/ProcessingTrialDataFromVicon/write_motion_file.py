@@ -1,15 +1,19 @@
 
 import numpy as np
 
-def write_motion_file(grf_complete: np.ndarray, file_path: str, headers: list):
+def write_motion_file(grf_complete: np.ndarray, file_path: str, *headers: list):
 	'''
 	This file will export the complete ground reaction force data into a _grf.mot file
 
 	Inputs:	grf_complete: an array of the complete ground reaction forces
 			file_path: a full file path to write a motion file to
-			headers: a list of all the headers
+			headers: a list of all the headers (optional), will default to a set list of headers
 
 	'''
+
+	if len(headers) == 0:
+		headers = ['time', 'ground_force_vx', 'ground_force_vy', 'ground_force_vz', 'ground_force_px',
+		'ground_force_py', 'ground_force_pz', 'ground_torque_x', 'ground_torque_y', 'ground_torque_z']
 
 	# Get dimensions of the pre-processed grf data
 	m,n = np.shape(grf_complete)

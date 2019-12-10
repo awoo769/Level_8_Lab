@@ -1,10 +1,19 @@
 
 import numpy as np
 
-def write_motion_file(grf_complete: np.ndarray, file_path: str):
+def write_motion_file(grf_complete: np.ndarray, file_path: str, *headers: list):
 	'''
 	This file will export the complete ground reaction force data into a _grf.mot file
+
+	Inputs:	grf_complete: an array of the complete ground reaction forces
+			file_path: a full file path to write a motion file to
+			headers: a list of all the headers (optional), will default to a set list of headers
+
 	'''
+
+	if len(headers) == 0:
+		headers = ['time', 'ground_force_vx', 'ground_force_vy', 'ground_force_vz', 'ground_force_px',
+		'ground_force_py', 'ground_force_pz', 'ground_torque_x', 'ground_torque_y', 'ground_torque_z']
 
 	# Get dimensions of the pre-processed grf data
 	m,n = np.shape(grf_complete)
@@ -19,16 +28,16 @@ def write_motion_file(grf_complete: np.ndarray, file_path: str):
 	fid = open(new_file, 'w+')
 
 	# Print header
-	fid.write("%s\n" % (file_name))
+	fid.write("%s\n" % (file_name.split("\\")[-1]))
 	fid.write("version=1\n")
 	fid.write("nRows=%d\n" % (m))
 	fid.write("nColumns=%d\n" % (n))
 	fid.write("inDegrees=yes\n")
 	fid.write("endheader\n\n")
 
-	# headers
-	fid.write("time\tground_force_vx\tground_force_vy\tground_force_vz\tground_force_px\tground_force_py\tground_force_pz\t")
-	fid.write("ground_torque_x\tground_torque_y\tground_torque_z\n")
+	# [time vector1 point1 vector2 point2 torque1 torque2]
+	for header in headers:
+		fid.write("%s\t" % (header))
 
 	fid.close()
 
@@ -43,7 +52,7 @@ def write_motion_file(grf_complete: np.ndarray, file_path: str):
 	fid.close()
 
 	# Print new file name for the user
-	print(new_file)
+	print("New MOT location: %s" % (new_file))
 
 
 

@@ -49,7 +49,7 @@ def write_trc(marker_labels: list, header_information: dict, frame_numbers: np.n
 	fid = open(full_file_name, "w+")
 
 	# Get just the file name from the full file name
-	file_name = full_file_name.rsplit('/',1)[-1]
+	file_name = full_file_name.split('\\')[-1]
 	
 	# Write the header information
 	fid.write("PathFileType\t4\t(X/Y/Z)\t%s\n" % (file_name))
@@ -94,6 +94,6 @@ def write_trc(marker_labels: list, header_information: dict, frame_numbers: np.n
 	fid.close()
 
 	# Print new file name for the user
-	print(full_file_name)
+	print('New TRC location: %s\n' % (full_file_name))
 
 

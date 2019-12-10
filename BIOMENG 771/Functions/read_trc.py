@@ -20,6 +20,8 @@ def read_trc(*file_path: str):
 	trc_read() returns a class, trcContents (format shown below), containing the contents of the TRC file selected 
 	via a user interface dialog box.
 
+	Input: file_path: optional argument containing the full file path to the .trc file
+
 	Output Structure Format:
 
 	trcContents (Dictionary): 
