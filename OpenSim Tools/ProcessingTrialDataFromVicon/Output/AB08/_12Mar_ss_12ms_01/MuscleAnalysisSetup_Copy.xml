@@ -14,7 +14,7 @@
 		<!--Initial time for the simulation.-->
 		<initial_time>15.300000000000001</initial_time>
 		<!--Final time for the simulation.-->
-		<final_time>30.454999999999998</final_time>
+		<final_time>30.454999923706055</final_time>
 		<!--Flag indicating whether or not to compute equilibrium values for states other than the coordinates or speeds.  For example, equilibrium muscle fiber lengths or muscle forces.-->
 		<solve_for_equilibrium_for_auxiliary_states>false</solve_for_equilibrium_for_auxiliary_states>
 		<!--Maximum number of integrator steps.-->
@@ -34,7 +34,7 @@
 					<!--Start time.-->
 					<start_time>15.300000000000001</start_time>
 					<!--End time.-->
-					<end_time>30.454999999999998</end_time>
+					<end_time>30.454999923706055</end_time>
 					<!--Specifies how often to store results during a simulation. More specifically, the interval (a positive integer) specifies how many successful integration steps should be taken before results are recorded again.-->
 					<step_interval>1</step_interval>
 					<!--Flag (true or false) indicating whether the results are in degrees or not.-->
@@ -44,7 +44,7 @@
 					<!--List of generalized coordinates for which to compute moment arms. Use 'all' to compute for all coordinates.-->
 					<moment_arm_coordinate_list> all</moment_arm_coordinate_list>
 					<!--Flag indicating whether moment-arms and/or moments should be computed.-->
-					<compute_moments>false</compute_moments>
+					<compute_moments>true</compute_moments>
 				</MuscleAnalysis>
 			</objects>
 			<groups />

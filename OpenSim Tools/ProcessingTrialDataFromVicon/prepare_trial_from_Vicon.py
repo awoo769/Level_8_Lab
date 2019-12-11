@@ -14,7 +14,6 @@ from fix_grf_headers import fix_grf_headers
 from write_mot import write_mot
 from xml_shorten import xml_shorten
 
-from setup_muscle_analysis_xml import setup_muscle_analysis_xml
 from setup_muscle_force_direction_xml import setup_muscle_force_direction_xml
 
 # OpenSim API
@@ -22,6 +21,7 @@ from setup_ID_xml import setup_ID_xml
 from setup_IK_xml import setup_IK_xml
 from setup_load_xml import setup_load_xml
 from setup_scale_xml import setup_scale_xml
+from setup_muscle_analysis_xml import setup_muscle_analysis_xml
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -282,10 +282,10 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	write_mot(grf_data, new_filename, new_headers)
 	
 	# Create the ID setup xml file using the OpenSim API
-	setup_ID_xml(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	setup_ID_xml(trial, model, output_directory, time_range, cut_off_frequency)
 
 	# Create the external load setup xml file using the OpenSim API
-	setup_load_xml(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
+	#setup_load_xml(trial, model, output_directory, cut_off_frequency)
 
 	''' EMG Processing '''
 
@@ -293,10 +293,10 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	''' Muscle Analysis Files '''
 
+	# Create the muscle analysis setup xml file using the OpenSim API
 	setup_muscle_analysis_xml(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_analysis_filename.split("\\")[-1]
-	xml_shorten(filename)
 
+	# Create the muscle force direction setup xml file NOT using the OpenSim API
 	setup_muscle_force_direction_xml(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_force_direction_filename.split("\\")[-1]
 	xml_shorten(filename)

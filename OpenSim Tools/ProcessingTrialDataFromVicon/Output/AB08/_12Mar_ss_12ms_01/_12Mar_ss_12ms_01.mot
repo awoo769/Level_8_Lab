@@ -5,7 +5,7 @@ nColumns=19
 inDegrees=yes
 endheader
 
-['time', 'ground_force_vx', 'ground_force_vy', 'ground_force_vz', 'ground_force_px', 'ground_force_py', 'ground_force_pz', 'ground_torque_x', 'ground_torque_y', 'ground_torque_z', '1_ground_force_vx', '1_ground_force_vy', '1_ground_force_vz', '1_ground_force_px', '1_ground_force_py', '1_ground_force_pz', '1_ground_torque_x', '1_ground_torque_y', '1_ground_torque_z\n']	15.300000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-46.095740	634.396742	3.719764	0.572903	0.000000	-0.901986	0.000033	-15.714630	0.000009
+['time', '1_ground_force_vx', '1_ground_force_vy', '1_ground_force_vz', '1_ground_force_px', '1_ground_force_py', '1_ground_force_pz', '1_ground_torque_x', '1_ground_torque_y', '1_ground_torque_z', 'ground_force_vx', 'ground_force_vy', 'ground_force_vz', 'ground_force_px', 'ground_force_py', 'ground_force_pz', 'ground_torque_x', 'ground_torque_y', 'ground_torque_z\n']	15.300000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-46.095740	634.396742	3.719764	0.572903	0.000000	-0.901986	0.000033	-15.714630	0.000009
 15.301000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-46.009806	634.915157	3.140926	0.572948	0.000000	-0.900806	0.000033	-15.729182	0.000010
 15.302000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-45.927245	635.461363	2.560292	0.572993	0.000000	-0.899620	0.000032	-15.744938	0.000011
 15.303000	-0.000000	0.000000	-0.000000	0.000000	0.000000	0.000000	0.000000	-0.000000	0.000000	-45.848254	636.035908	1.978241	0.573038	0.000000	-0.898429	0.000031	-15.761906	0.000012

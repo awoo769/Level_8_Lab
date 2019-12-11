@@ -1,7 +1,7 @@
 import numpy as np
-from xml.dom import minidom
+import opensim as osim
 
-def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, directory: str, time__range: list, cut_off_freq: int):
+def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
 	'''
 	NOTE: Any attribute not changed within this function must be changed in the original template 
 	file 
@@ -15,83 +15,40 @@ def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, dire
 
 	'''
 
-	doc_node = minidom.parse(muscle_filename)
+	# Get analyze tool
+	#analyze_tool = osim.AnalyzeTool()
+	analyze_tool = osim.AnalyzeTool(muscle_filename, True)
 
-	''' Get Hierarchy Access '''
-	analyze_tool = doc_node.getElementsByTagName("AnalyzeTool")
-	analyze_tool_child = analyze_tool.item(0)
-
-	res_directory = analyze_tool_child.getElementsByTagName("results_directory")
-	res_directory_child = res_directory.item(0)
-
-	model_file = analyze_tool_child.getElementsByTagName("model_file")
-	model_file_child = model_file.item(0)
-
-	initial_time = analyze_tool_child.getElementsByTagName("initial_time")
-	initial_time_child = initial_time.item(0)
-
-	final_time = analyze_tool_child.getElementsByTagName("final_time")
-	final_time_child = final_time.item(0)
-
-	ex_loads_file = analyze_tool_child.getElementsByTagName("external_loads_file")
-	ex_loads_file_child = ex_loads_file.item(0)
-
-	coords_file = analyze_tool_child.getElementsByTagName("coordinates_file")
-	coords_file_child = coords_file.item(0)
-
-	analysis_set = analyze_tool_child.getElementsByTagName("AnalysisSet")
-	analysis_set_child = analysis_set.item(0)
-
-	objects_set = analysis_set_child.getElementsByTagName("objects")
-	objects_set_child = objects_set.item(0)
-
-	filter_frequency = analyze_tool_child.getElementsByTagName("lowpass_cutoff_frequency_for_coordinates")
-	filter_frequency_child = filter_frequency.item(0)
-
-	''' Muscle analysis settings '''
-
-	muscle_analysis = objects_set_child.getElementsByTagName("MuscleAnalysis")
-	muscle_analysis_child = muscle_analysis.item(0)
-
-	muscle_analysis_start_time = muscle_analysis_child.getElementsByTagName("start_time")
-	muscle_analysis_start_time_child = muscle_analysis_start_time.item(0)
-
-	muscle_analysis_end_time = muscle_analysis_child.getElementsByTagName("end_time")
-	muscle_analysis_end_time_child = muscle_analysis_end_time.item(0)
-
-	''' Set new directory, filenames, and number inputs '''
-
+	# Set tool name
 	new_analyze_tool_name = model + trial
-	analyze_tool_child.setAttribute('name', new_analyze_tool_name)
+	analyze_tool.setName(new_analyze_tool_name)
 
-	# Local directory
-	res_directory_child.firstChild.data = ".\\"
-
-	# OpenSim model name
-	model_file_name = model + ".osim"
-	model_file_child.firstChild.data = model_file_name
+	# Set the opensim model name
+	analyze_tool.setModelFilename(directory + "\\" + model + "\\" + model + ".osim")
 	
-	external_loads_file = trial + 'ExternalLoads.xml'
-	ex_loads_file_child.firstChild.data = external_loads_file
+	# Set the results directory
+	analyze_tool.setResultsDir(directory + "\\" + model + "\\" + trial)
 
-	coordsfile = trial + 'IKResults.mot'
-	coords_file_child.firstChild.data = coordsfile
+	# Set the external loads file
+	external_loads_file = directory + "\\" + model + "\\" + trial + "\\" + trial + 'ExternalLoads.xml'
+	analyze_tool.setExternalLoadsFileName(external_loads_file)
 
-	filter_frequency_child.firstChild.data = str(cut_off_freq)
+	# Set the coordinates file
+	coord_file = directory + "\\" + model + "\\" + trial + "\\" + trial + 'IKResults.mot'
+	analyze_tool.setCoordinatesFileName(coord_file)
 
-	# Set start and end time for all tools
-	starttime = str(time__range[0])
-	endtime = str(time__range[-1])
+	# Set low pass cut-off frequency, NOTE: Must be a double (np.float64)
+	analyze_tool.setLowpassCutoffFrequency(np.float64(cut_off_freq))
 
-	initial_time_child.firstChild.data = starttime
-	final_time_child.firstChild.data = endtime
+	# Set the time range, NOTE: Must be a double (np.float64)
+	analyze_tool.setInitialTime(np.float64(time_range[0]))
+	analyze_tool.setFinalTime(np.float64(time_range[-1]))
 
-	muscle_analysis_start_time_child.firstChild.data = starttime
-	muscle_analysis_end_time_child.firstChild.data = endtime
+	for analysis in analyze_tool.getAnalysisSet():
+		analysis.setStartTime(np.float64(time_range[0]))
+		analysis.setEndTime(np.float64(time_range[-1]))
 	
 	''' Write file '''
 	
-	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_filename.split("\\")[-1]
-
-	with open(new_filename, 'w') as xml_file:
-		doc_node.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')
+	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_filename.split("\\")[-1]
+	analyze_tool.printToXML(xml_setup_path)
