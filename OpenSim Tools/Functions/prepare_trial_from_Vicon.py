@@ -11,7 +11,7 @@ from trim_trc import trim_trc
 from remove_bad_markers import remove_bad_markers
 from rezero_filter import rezero_filter
 from fix_grf_headers import fix_grf_headers
-from write_mot import write_mot
+from write_motion_file import write_motion_file
 from xml_shorten import xml_shorten
 
 from setup_muscle_analysis_xml import setup_muscle_analysis_xml
@@ -49,7 +49,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	input_directory = os.path.abspath(input_directory)
 	output_directory = os.path.abspath(output_directory)
 
-	# List which contains the n ames of the motion capture trial which didn't record EMG data
+	# List which contains the names of the motion capture trial which didn't record EMG data
 	bad_EMG_trials = ['SAFIST015_SS21_20Jun_ss_035ms_02','SAFIST015_SS21_20Jun_fast_075ms_02',
 	'SAFIST015_SS42_20Jun_ss_035ms_01','SAFIST015_SS42_20Jun_fast_055ms_01','SAFIST015_SS52_ss_04ms_02',
 	'SAFIST015_SS52_fast_07ms_01','SS77_SAFIST015_18Jun_fast_04ms_02','SAFIST015_19Jun_SS90_ss_035ms_01',
@@ -99,6 +99,9 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	ex_loads_filename = os.path.join(xml_directory, "ExternalLoads.xml")
 	muscle_analysis_filename = os.path.join(xml_directory, "MuscleAnalysisSetup.xml")
 	muscle_force_direction_filename = os.path.join(xml_directory, "MuscleForceDirectionSetup.xml")
+	scale_filename = os.path.join(xml_directory, "ScaleSetup.xml")
+
+	#setup_scale_xml(scale_filename, trial, model, output_directory, input_directory)
 
 	''' Pull in exported Vicon files, identify time range of interest '''
 	# Note: this approach differs with regard to available event data
@@ -119,7 +122,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	
 	if not bad_EMG:
 		#TODO
-		pass
+		a = 1
 
 	grf_headers, full_grf_data = read_mot(8, mot_filename)
 
@@ -168,7 +171,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	write_trc(good_marker_names, mkr_data["Information"], trimmed_frames, new_mkr_data, new_filename)
 
-	# Create the IK setup xml file using the OpenSim API
+	# Note: this function edits the xml file. This is better done using the OpenSim APIs if you can
 	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names)
 	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
 	xml_shorten(filename)
@@ -279,13 +282,15 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	new_headers = fix_grf_headers(grf_headers, steps, plates)
 	
 	new_filename = os.path.join(output_model_trial_dir, trial + "." + "mot")
-	write_mot(grf_data, new_filename, new_headers)
+	write_motion_file(grf_data, new_filename, new_headers)
 	
-	# Create the ID setup xml file using the OpenSim API
 	setup_ID_xml(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ID_filename.split("\\")[-1]
+	xml_shorten(filename)
 
-	# Create the external load setup xml file using the OpenSim API
 	setup_load_xml(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ex_loads_filename.split("\\")[-1]
+	xml_shorten(filename)
 
 	''' EMG Processing '''
 

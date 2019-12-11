@@ -1,7 +1,7 @@
 
 import numpy as np
 
-def write_motion_file(grf_complete: np.ndarray, file_path: str, *headers: list):
+def write_mot(grf_complete: np.ndarray, file_path: str, *headers: list):
 	'''
 	This file will export the complete ground reaction force data into a _grf.mot file
 
