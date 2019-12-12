@@ -5,7 +5,7 @@
 		<model_file>../../H23s1.osim</model_file>
 		<!--Replace the model's force set with sets specified in <force_set_files>? If false, the force set is appended to.-->
 		<replace_force_set>false</replace_force_set>
-		<!--List of xml files used to construct an force set for the model.-->
+		<!--List of xml files used to construct a force set for the model.-->
 		<force_set_files />
 		<!--Directory used for writing results.-->
 		<results_directory>.\</results_directory>

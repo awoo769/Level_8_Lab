@@ -11,10 +11,12 @@ from trim_trc import trim_trc
 from remove_bad_markers import remove_bad_markers
 from rezero_filter import rezero_filter
 from fix_grf_headers import fix_grf_headers
-from write_motion_file import write_motion_file
+from write_mot import write_mot
 from xml_shorten import xml_shorten
+from read_emg_mot import read_emg_mot
+from emg_envelope import emg_envelope
+from write_emg import write_emg
 
-from setup_muscle_analysis_xml import setup_muscle_analysis_xml
 from setup_muscle_force_direction_xml import setup_muscle_force_direction_xml
 
 # OpenSim API
@@ -22,6 +24,7 @@ from setup_ID_xml import setup_ID_xml
 from setup_IK_xml import setup_IK_xml
 from setup_load_xml import setup_load_xml
 from setup_scale_xml import setup_scale_xml
+from setup_muscle_analysis_xml import setup_muscle_analysis_xml
 
 def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, input_directory: str):
 	'''
@@ -49,7 +52,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	input_directory = os.path.abspath(input_directory)
 	output_directory = os.path.abspath(output_directory)
 
-	# List which contains the names of the motion capture trial which didn't record EMG data
+	# List which contains the n ames of the motion capture trial which didn't record EMG data
 	bad_EMG_trials = ['SAFIST015_SS21_20Jun_ss_035ms_02','SAFIST015_SS21_20Jun_fast_075ms_02',
 	'SAFIST015_SS42_20Jun_ss_035ms_01','SAFIST015_SS42_20Jun_fast_055ms_01','SAFIST015_SS52_ss_04ms_02',
 	'SAFIST015_SS52_fast_07ms_01','SS77_SAFIST015_18Jun_fast_04ms_02','SAFIST015_19Jun_SS90_ss_035ms_01',
@@ -75,8 +78,11 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 		mot_filename = os.path.join(input_directory, model + trial + "." + "mot")
 
 	if not os.path.exists(emg_filename):
-		print('No EMG for subject %s.\n' % (model))
-		bad_EMG = 1
+		emg_filename = os.path.join(input_directory, model + trial + "_EMG." + "mot")
+    
+		if not os.path.exists(emg_filename):
+			print('No EMG data for subject %s.\n' % (model))
+			bad_EMG = 1
 
 	# Make new folder for the output of this model if it doesn't already exist
 	output_model_dir = os.path.join(output_directory, model)
@@ -94,14 +100,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	xml_directory = output_directory.replace("Output", "xmlTemplates")
 
 	# Generate filenames
-	IK_filename = os.path.join(xml_directory, "IKSetup.xml")
-	ID_filename = os.path.join(xml_directory, "IDSetup.xml")
-	ex_loads_filename = os.path.join(xml_directory, "ExternalLoads.xml")
-	muscle_analysis_filename = os.path.join(xml_directory, "MuscleAnalysisSetup.xml")
 	muscle_force_direction_filename = os.path.join(xml_directory, "MuscleForceDirectionSetup.xml")
-	scale_filename = os.path.join(xml_directory, "ScaleSetup.xml")
-
-	#setup_scale_xml(scale_filename, trial, model, output_directory, input_directory)
 
 	''' Pull in exported Vicon files, identify time range of interest '''
 	# Note: this approach differs with regard to available event data
@@ -121,8 +120,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	print('\n')
 	
 	if not bad_EMG:
-		#TODO
-		a = 1
+		emg_headers, emg_data, emg_frequency = read_emg_mot(emg_filename)
 
 	grf_headers, full_grf_data = read_mot(8, mot_filename)
 
@@ -134,7 +132,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	time_range = []
 
 	time_range.append(round(max(time[0], 0) + 0.020, 3))
-	time_range.append(time[-1])
+	time_range.append(np.float64(time[-1]))
 
 	index_start = np.where(time == time_range[0])
 	index_end = np.where(time == time_range[1])
@@ -171,9 +169,9 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 
 	write_trc(good_marker_names, mkr_data["Information"], trimmed_frames, new_mkr_data, new_filename)
 
-	# Note: this function edits the xml file. This is better done using the OpenSim APIs if you can
-	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
+	# Create the IK setup xml file using the OpenSim API
+	setup_IK_xml(trial, model, output_directory, time_range, good_marker_names)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "IKSetup.xml"
 	xml_shorten(filename)
 	
 	''' ID files '''
@@ -282,29 +280,56 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	new_headers = fix_grf_headers(grf_headers, steps, plates)
 	
 	new_filename = os.path.join(output_model_trial_dir, trial + "." + "mot")
-	write_motion_file(grf_data, new_filename, new_headers)
+	write_mot(grf_data, new_filename, new_headers)
 	
-	setup_ID_xml(ID_filename, trial, model, output_directory, time_range, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ID_filename.split("\\")[-1]
-	xml_shorten(filename)
+	# Create the ID setup xml file using the OpenSim API
+	setup_ID_xml(trial, model, output_directory, time_range, cut_off_frequency)
 
-	setup_load_xml(ex_loads_filename, trial, model, output_directory, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + ex_loads_filename.split("\\")[-1]
-	xml_shorten(filename)
+	# Create the external load setup xml file using the OpenSim API
+	setup_load_xml(trial, model, output_directory, cut_off_frequency)
 
 	''' EMG Processing '''
 
-	# TODO
+	if bad_EMG == 0:
+		emg_env = emg_envelope(emg_data, emg_frequency)
+
+		# Return correct frame and sub-frame numbers
+		if ('Frame' in emg_headers[0]) and ('Frame' in emg_headers[1]):
+			emg_env[:,0:2] = emg_data[:,0:2]
+		
+		emg_delay = 0.020 # 2 frames at 100 Hz or 4 frames at 200 Hz
+		frame_offset = emg_delay / (1/data_rate)
+		emg_start = np.where(emg_env[:,0] == (frame_range[0] - frame_offset))[0]
+		emg_end = np.where(emg_data[:,0] == (frame_range[-1] - frame_offset))[0]
+
+		emg_time = np.linspace((time_range[0] - emg_delay), (time_range[-1] - emg_delay), len(grf_data))
+
+		# Clip the top and bottom of the EMG data to fit the grf data size
+		clipped_emg = emg_env[emg_start[-1]:emg_end[-1]+1,:]
+
+		emg = np.concatenate((emg_time[:, np.newaxis], clipped_emg[:, 2:]), axis=1)
+
+		emg_labels = emg_headers[2:]
+		emg_labels.insert(0, 'time')
+
+		emg_new_filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "_EMG.mot"
+		write_emg(emg, emg_labels, emg_new_filename)
+
 
 	''' Muscle Analysis Files '''
 
-	setup_muscle_analysis_xml(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_analysis_filename.split("\\")[-1]
+	# Create the muscle analysis setup xml file using the OpenSim API
+	setup_muscle_analysis_xml(trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleAnalysisSetup.xml"
 	xml_shorten(filename)
 
+	# Create the muscle force direction setup xml file. This is a 3rd party analysis so does not use OpenSim API
 	setup_muscle_force_direction_xml(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_force_direction_filename.split("\\")[-1]
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleForceDirectionSetup.xml"
 	xml_shorten(filename)
+
+	print("Completed trial preparation for model = %s\ttrial = %s." % (model, trial))
+
 
 # Let the user select the input and output directory folders in Jupyter notebook
 
@@ -313,5 +338,6 @@ output_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\
 input_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\InputDirectory"
 xml_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\xmlTemplates"
 
-prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
+prepare_trial_from_Vicon("AB28","_05Apr_ss_11ms_01", output_directory, input_directory)
+#prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
 

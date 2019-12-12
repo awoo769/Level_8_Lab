@@ -52,7 +52,7 @@ def write_mot(grf_complete: np.ndarray, file_path: str, *headers: list):
 	fid.close()
 
 	# Print new file name for the user
-	print("New MOT location: %s" % (new_file))
+	print("New MOT location: %s\n" % (new_file))
 
 
 
