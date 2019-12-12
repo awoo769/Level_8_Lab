@@ -28,9 +28,10 @@ def setup_load_xml(trial: str, model: str, directory: str, cut_off_freq: np.floa
 	external_loads.setLowpassCutoffFrequencyForLoadKinematics(np.float64(cut_off_freq))
 
 	''' Add external forces '''
-
+	
 	# Left side
 	external_force_left = osim.ExternalForce()
+	
 	external_force_left.setName("left")
 
 	external_force_left.set_applied_to_body("calcn_l")
@@ -40,11 +41,13 @@ def setup_load_xml(trial: str, model: str, directory: str, cut_off_freq: np.floa
 	external_force_left.set_force_identifier("1_ground_force_v")
 	external_force_left.set_point_identifier("1_ground_force_p")
 	external_force_left.set_torque_identifier("1_ground_torque_")
-
-	external_loads.adoptAndAppend(external_force_left)
-
+	
+	# Adopt and append is causing code to stop after printing to XML. Unsure why.
+	external_loads.cloneAndAppend(external_force_left)
+	
 	# Right side
 	external_force_right = osim.ExternalForce()
+	
 	external_force_right.setName("right")
 
 	external_force_right.set_applied_to_body("calcn_r")
@@ -54,10 +57,12 @@ def setup_load_xml(trial: str, model: str, directory: str, cut_off_freq: np.floa
 	external_force_right.set_force_identifier("ground_force_v")
 	external_force_right.set_point_identifier("ground_force_p")
 	external_force_right.set_torque_identifier("ground_torque_")
-
-	external_loads.adoptAndAppend(external_force_right)
+	
+	external_loads.cloneAndAppend(external_force_right)
 	
 	''' Write new file '''
 
 	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + "ExternalLoads.xml"
+
 	external_loads.printToXML(new_filename)
+

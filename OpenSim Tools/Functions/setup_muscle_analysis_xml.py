@@ -1,13 +1,13 @@
 import numpy as np
 import opensim as osim
+from xml.dom import minidom
 
-def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
+def setup_muscle_analysis_xml(trial: str, model: str, directory: str, time_range: list, cut_off_freq: np.float64):
 	'''
 	NOTE: Any attribute not changed within this function must be changed in the original template 
 	file 
-
-	Inputs:	muscle_filename: full filename for the template muscle analysis setup xml file
-			trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
+	
+	Inputs:	trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
 			model: model name, e.g., "AB08"
 			directory: output directory name
 			time_range: start and end times
@@ -16,9 +16,8 @@ def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, dire
 	'''
 
 	# Get analyze tool
-	#analyze_tool = osim.AnalyzeTool()
-	analyze_tool = osim.AnalyzeTool(muscle_filename, True)
-
+	analyze_tool = osim.AnalyzeTool()	
+	
 	# Set tool name
 	new_analyze_tool_name = model + trial
 	analyze_tool.setName(new_analyze_tool_name)
@@ -44,11 +43,36 @@ def setup_muscle_analysis_xml(muscle_filename: str, trial: str, model: str, dire
 	analyze_tool.setInitialTime(np.float64(time_range[0]))
 	analyze_tool.setFinalTime(np.float64(time_range[-1]))
 
-	for analysis in analyze_tool.getAnalysisSet():
-		analysis.setStartTime(np.float64(time_range[0]))
-		analysis.setEndTime(np.float64(time_range[-1]))
+	''' Add muscle analysis '''
+
+	analysis_set = analyze_tool.getAnalysisSet()
+
+	muscle_analysis = osim.MuscleAnalysis()
+
+	muscle_analysis.setStartTime(np.float64(time_range[0]))
+	muscle_analysis.setEndTime(np.float64(time_range[-1]))
+	muscle_analysis.setComputeMoments(True) # Bug, this is not being set to true in the xml file
+
+	analysis_set.cloneAndAppend(muscle_analysis)
 	
 	''' Write file '''
 	
-	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_filename.split("\\")[-1]
+	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleAnalysisSetup.xml"
 	analyze_tool.printToXML(xml_setup_path)
+
+	''' Temporary fix to set compute moments to true '''
+	
+	dom = minidom.parse(xml_setup_path)
+	analysis_set = dom.getElementsByTagName("AnalysisSet")
+	analysis_set_child = analysis_set.item(0)
+
+	objects_set = analysis_set_child.getElementsByTagName("objects")
+	objects_set_child = objects_set.item(0)
+
+	muscle_analysis = objects_set_child.getElementsByTagName("MuscleAnalysis")
+	muscle_analysis_child = muscle_analysis.item(0)
+
+	muscle_analysis_child.getElementsByTagName("compute_moments")[0].firstChild.nodeValue = "true"
+
+	with open(xml_setup_path, 'w') as xml_file:
+		dom.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')

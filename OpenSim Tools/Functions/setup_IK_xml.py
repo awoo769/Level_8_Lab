@@ -2,12 +2,11 @@ import numpy as np
 import opensim as osim
 from xml.dom import minidom
 
-def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_range: list, marker_names: list):
+def setup_IK_xml(trial: str, model: str, directory: str, time_range: list, marker_names: list):
 	'''
 	Rewrites the IK setup xml file for a new trial
-
-	Inputs:	ik_filename: full filename for the template inverse kinematics setup xml file
-			trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
+	
+	Inputs:	trial: trial name, e.g.,  "_12Mar_ss_12ms_01"
 			model: model name, e.g., "AB08"
 			directory: output directory name
 			time_range: start and end times
@@ -16,9 +15,9 @@ def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_
 	'''
 
 	# Create an instance of the inverse kinematics tool
-	IK_tool = osim.InverseKinematicsTool(ik_filename)
+	IK_tool = osim.InverseKinematicsTool()
 
-	# Set name
+	# Set the name of the tool
 	IK_tool.setName(model)
 
 	# Set the time range, NOTE: Must be a double (np.float64)
@@ -41,29 +40,31 @@ def setup_IK_xml(ik_filename: str, trial: str, model: str, directory: str, time_
 	IK_tool.setInputsDir(directory + "\\" + model + "\\" + trial)
 	IK_tool.setResultsDir(directory + "\\" + model + "\\" + trial)
 
-	''' Remove any absent markers, set weighting for bony landmarks (anatomical markers) '''
+	''' Add markers and set weighting '''
 
 	# List of bony anatomical landmarkers to give high weighting
 	bony_landmarks = ['LMMAL','RMMAL','LLMAL','RLMAL','LASI','RASI','LPSI','RPSI']
 
-	for marker in IK_tool.getIKTaskSet():
-		# markers.getName() is the name of each marker
-		current_marker = marker.getName()
+	# Create IKTaskSet
+	IK_task_set = IK_tool.getIKTaskSet()
 
-		# If the marker in the inverse kinematics tool is one which we are using
-		if (current_marker in marker_names):
-			marker.setApply(True)
+	# Assign markers and weights
+	for marker in marker_names:
+		IK_marker_task = osim.IKMarkerTask()
+		IK_marker_task.setName(marker)
+		
+		if marker in bony_landmarks:
+			IK_marker_task.setApply(True)
+			IK_marker_task.setWeight(10)
 		else:
-			marker.setApply(False)
-
-		if current_marker in bony_landmarks:
-			marker.setWeight(10)
-		else:
-			marker.setWeight(1)
+			IK_marker_task.setApply(True)
+			IK_marker_task.setWeight(1)
+			
+		IK_task_set.cloneAndAppend(IK_marker_task)
 
 	''' Write changes to an XML setup file '''
 
-	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + ik_filename.split("\\")[-1]
+	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + "IKSetup.xml"
 	IK_tool.printToXML(xml_setup_path)
 
 	''' Temporary fix for setting model name using XML parsing '''

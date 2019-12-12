@@ -94,10 +94,6 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	xml_directory = output_directory.replace("Output", "xmlTemplates")
 
 	# Generate filenames
-	IK_filename = os.path.join(xml_directory, "IKSetup.xml")
-	ID_filename = os.path.join(xml_directory, "IDSetup.xml")
-	ex_loads_filename = os.path.join(xml_directory, "ExternalLoads.xml")
-	muscle_analysis_filename = os.path.join(xml_directory, "MuscleAnalysisSetup.xml")
 	muscle_force_direction_filename = os.path.join(xml_directory, "MuscleForceDirectionSetup.xml")
 
 	''' Pull in exported Vicon files, identify time range of interest '''
@@ -169,8 +165,8 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	write_trc(good_marker_names, mkr_data["Information"], trimmed_frames, new_mkr_data, new_filename)
 
 	# Create the IK setup xml file using the OpenSim API
-	setup_IK_xml(IK_filename, trial, model, output_directory, time_range, good_marker_names)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + IK_filename.split("\\")[-1]
+	setup_IK_xml(trial, model, output_directory, time_range, good_marker_names)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "IKSetup.xml"
 	xml_shorten(filename)
 	
 	''' ID files '''
@@ -285,8 +281,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	setup_ID_xml(trial, model, output_directory, time_range, cut_off_frequency)
 
 	# Create the external load setup xml file using the OpenSim API
-	#setup_load_xml(trial, model, output_directory, cut_off_frequency)
-
+	setup_load_xml(trial, model, output_directory, cut_off_frequency)
 	''' EMG Processing '''
 
 	# TODO
@@ -294,12 +289,15 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	''' Muscle Analysis Files '''
 
 	# Create the muscle analysis setup xml file using the OpenSim API
-	setup_muscle_analysis_xml(muscle_analysis_filename, trial, model, output_directory, time_range, cut_off_frequency)
+	setup_muscle_analysis_xml(trial, model, output_directory, time_range, cut_off_frequency)
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleAnalysisSetup.xml"
+	xml_shorten(filename)
 
 	# Create the muscle force direction setup xml file NOT using the OpenSim API
 	setup_muscle_force_direction_xml(muscle_force_direction_filename, trial, model, output_directory, time_range, cut_off_frequency)
-	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + muscle_force_direction_filename.split("\\")[-1]
+	filename = output_directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleForceDirectionSetup.xml"
 	xml_shorten(filename)
+
 
 # Let the user select the input and output directory folders in Jupyter notebook
 

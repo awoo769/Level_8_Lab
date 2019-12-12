@@ -65,16 +65,16 @@ def setup_muscle_force_direction_xml(force_filename: str, trial: str, model: str
 	analyze_tool_child.setAttribute('name', new_analyze_tool_name)
 
 	# Local directory
-	res_directory_child.firstChild.data = ".\\"
+	res_directory_child.firstChild.data = directory + "\\" + model + "\\" + trial
 
 	# OpenSim model name
-	model_file_name = model + ".osim"
+	model_file_name = directory + "\\" + model + "\\" + model + ".osim"
 	model_file_child.firstChild.data = model_file_name
 	
-	external_loads_file = trial + 'ExternalLoads.xml'
+	external_loads_file = directory + "\\" + model + "\\" + trial + "\\" + trial + 'ExternalLoads.xml'
 	ex_loads_file_child.firstChild.data = external_loads_file
 
-	coordsfile = trial + 'IKResults.mot'
+	coordsfile = directory + "\\" + model + "\\" + trial + "\\" + trial + 'IKResults.mot'
 	coords_file_child.firstChild.data = coordsfile
 
 	filter_frequency_child.firstChild.data = str(cut_off_freq)
@@ -91,7 +91,7 @@ def setup_muscle_force_direction_xml(force_filename: str, trial: str, model: str
 	
 	''' Write file '''
 	
-	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + force_filename.split("\\")[-1]
+	new_filename = directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleForceDirectionSetup.xml"
 
 	with open(new_filename, 'w') as xml_file:
 		doc_node.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')
