@@ -18,7 +18,7 @@ def emg_envelope(emg_data: np.array, emg_frequency: float):
 	# Use a fourth order Butterworth filter on the EMG data to filter
 	bb, ab = signal.butter(4, [20/(emg_frequency/2), 400/(emg_frequency/2)], 'band')
 
-	# Use a low pas filter to create EMG envelope
+	# Use a low pass filter to create EMG envelope
 	bl, al = signal.butter(4, 10/(emg_frequency/2), 'low')
 
 	emg_envelope = np.zeros(np.shape(emg_data))

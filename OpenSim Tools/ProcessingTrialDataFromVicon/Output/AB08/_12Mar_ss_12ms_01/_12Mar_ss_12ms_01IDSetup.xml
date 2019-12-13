@@ -18,7 +18,7 @@
 		<!--Low-pass cut-off frequency for filtering the coordinates_file data (currently does not apply to states_file or speeds_file). A negative value results in no filtering. The default value is -1.0, so no filtering.-->
 		<lowpass_cutoff_frequency_for_coordinates>10</lowpass_cutoff_frequency_for_coordinates>
 		<!--Name of the storage file (.sto) to which the generalized forces are written.-->
-		<output_gen_force_file>C:\Users\alexw\Dropbox\ABI\Level_8_Lab\OpenSim Tools\ProcessingTrialDataFromVicon\Output\AB08\_12Mar_ss_12ms_01\_12Mar_ss_12ms_01IDResults.sto</output_gen_force_file>
+		<output_gen_force_file>_12Mar_ss_12ms_01IDResults.sto</output_gen_force_file>
 		<!--List of joints (keyword All, for all joints) to report body forces acting at the joint frame expressed in ground.-->
 		<joints_to_report_body_forces />
 		<!--Name of the storage file (.sto) to which the body forces at specified joints are written.-->

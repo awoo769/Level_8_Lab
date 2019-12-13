@@ -47,7 +47,7 @@ def setup_ID_xml(trial: str, model: str, directory: str, time_range: list, cut_o
 	ID_tool.setCoordinatesFileName(coordindate_file)
 
 	# Set the output file
-	output_file_name = directory + "\\" + model + "\\" + trial + "\\" + trial + "IDResults.sto"
+	output_file_name = trial + "IDResults.sto"
 	ID_tool.setOutputGenForceFileName(output_file_name)
 	
 	''' Write changes to an XML setup file '''

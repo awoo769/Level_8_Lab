@@ -120,7 +120,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	print('\n')
 	
 	if not bad_EMG:
-		emg_headers, emg_data, emg_frequency = read_emg_mot(emg_filename)
+		emg_headers, emg_data, emg_frequency = read_emg_mot(emg_filename) # Read EMG mot file
 
 	grf_headers, full_grf_data = read_mot(8, mot_filename)
 
@@ -131,7 +131,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	# Create time range
 	time_range = []
 
-	time_range.append(round(max(time[0], 0) + 0.020, 3))
+	time_range.append(round(max(time[0], 0) + 0.020, 3)) # Add 0.020 due to EMG time delay
 	time_range.append(np.float64(time[-1]))
 
 	index_start = np.where(time == time_range[0])
@@ -338,6 +338,6 @@ output_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\
 input_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\InputDirectory"
 xml_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\xmlTemplates"
 
-prepare_trial_from_Vicon("AB28","_05Apr_ss_11ms_01", output_directory, input_directory)
-#prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
+#prepare_trial_from_Vicon("AB28","_05Apr_ss_11ms_01", output_directory, input_directory)
+prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
 

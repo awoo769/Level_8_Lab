@@ -20,6 +20,10 @@ def setup_IK_xml(trial: str, model: str, directory: str, time_range: list, marke
 	# Set the name of the tool
 	IK_tool.setName(model)
 
+	# Set the input and results directory
+	IK_tool.setInputsDir(directory + "\\" + model + "\\" + trial)
+	IK_tool.setResultsDir(directory + "\\" + model + "\\" + trial)
+
 	# Set the time range, NOTE: Must be a double (np.float64)
 	IK_tool.setStartTime(np.float64(time_range[0]))
 	IK_tool.setEndTime(np.float64(time_range[-1]))
@@ -33,12 +37,8 @@ def setup_IK_xml(trial: str, model: str, directory: str, time_range: list, marke
 	IK_tool.setCoordinateFileName(coordinate_file_name)
 
 	# Set the output motion file
-	output_file_name = directory + "\\" + model + "\\" + trial + "\\" + trial + "IKResults.mot"
+	output_file_name = trial + "IKResults.mot"
 	IK_tool.setOutputMotionFileName(output_file_name)
-
-	# Set the input and results directory
-	IK_tool.setInputsDir(directory + "\\" + model + "\\" + trial)
-	IK_tool.setResultsDir(directory + "\\" + model + "\\" + trial)
 
 	''' Add markers and set weighting '''
 

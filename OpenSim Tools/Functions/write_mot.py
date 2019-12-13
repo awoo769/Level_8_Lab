@@ -14,7 +14,8 @@ def write_mot(grf_complete: np.ndarray, file_path: str, *headers: list):
 	if len(headers) == 0:
 		headers = ['time', 'ground_force_vx', 'ground_force_vy', 'ground_force_vz', 'ground_force_px',
 		'ground_force_py', 'ground_force_pz', 'ground_torque_x', 'ground_torque_y', 'ground_torque_z']
-
+	else:
+		headers = headers[0]
 	# Get dimensions of the pre-processed grf data
 	m,n = np.shape(grf_complete)
 
@@ -37,16 +38,15 @@ def write_mot(grf_complete: np.ndarray, file_path: str, *headers: list):
 
 	# [time vector1 point1 vector2 point2 torque1 torque2]
 	for header in headers:
-		fid.write("%s\t" % (header))
+		if header != headers[-1]:
+			fid.write("%s\t" % (header))
+		else:
+			fid.write("%s" % (header))
 
-	fid.close()
-
-	# Print data
-	# Open the file to append to
-	fid = open(new_file, "a+")
-
-	# Save the force array to the file
-	np.savetxt(fid, grf_complete, fmt='%0.6f', delimiter='\t')
+	# Write the force array to the file
+	for i in range(m):
+		for j in range(n):
+			fid.write("%0.8f\t" % (grf_complete[i,j]))
 
 	# Close the file
 	fid.close()
