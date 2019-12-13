@@ -339,5 +339,5 @@ input_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\P
 xml_directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\OpenSim Tools\\ProcessingTrialDataFromVicon\\xmlTemplates"
 
 #prepare_trial_from_Vicon("AB28","_05Apr_ss_11ms_01", output_directory, input_directory)
-prepare_trial_from_Vicon("AB08","_12Mar_ss_12ms_01", output_directory, input_directory)
+prepare_trial_from_Vicon("AB28","_05Apr_ss_11ms_01", output_directory, input_directory)
 

@@ -278,7 +278,7 @@
 		<!--Flag (true or false) indicating whether or not to report marker errors from the inverse kinematics solution.-->
 		<report_errors>true</report_errors>
 		<!--Name of the resulting inverse kinematics motion (.mot) file.-->
-		<output_motion_file>_12Mar_ss_12ms_01IKResults.mot</output_motion_file>
+		<output_motion_file>C:\Users\alexw\Dropbox\ABI\Level_8_Lab\OpenSim Tools\ProcessingTrialDataFromVicon\Output\AB08\_12Mar_ss_12ms_01\_12Mar_ss_12ms_01IKResults.mot</output_motion_file>
 		<!--Flag indicating whether or not to report model marker locations. Note, model marker locations are expressed in Ground.-->
 		<report_marker_locations>false</report_marker_locations>
 	</InverseKinematicsTool>
