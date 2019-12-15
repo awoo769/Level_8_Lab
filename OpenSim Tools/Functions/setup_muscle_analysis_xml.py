@@ -60,7 +60,7 @@ def setup_muscle_analysis_xml(trial: str, model: str, directory: str, time_range
 	xml_setup_path = directory + "\\" + model + "\\" + trial + "\\" + trial + "MuscleAnalysisSetup.xml"
 	analyze_tool.printToXML(xml_setup_path)
 
-	''' Temporary fix to set compute moments to true '''
+	''' Temporary fix to set compute moments to true and to remove numerical inaccuracy in times '''
 	
 	dom = minidom.parse(xml_setup_path)
 	analysis_set = dom.getElementsByTagName("AnalysisSet")
@@ -73,6 +73,11 @@ def setup_muscle_analysis_xml(trial: str, model: str, directory: str, time_range
 	muscle_analysis_child = muscle_analysis.item(0)
 
 	muscle_analysis_child.getElementsByTagName("compute_moments")[0].firstChild.nodeValue = "true"
+
+	dom.getElementsByTagName("initial_time")[0].firstChild.nodeValue = round(time_range[0],3)
+	dom.getElementsByTagName("final_time")[0].firstChild.nodeValue = round(time_range[-1],3)
+	muscle_analysis_child.getElementsByTagName("start_time")[0].firstChild.nodeValue = round(time_range[0],3)
+	muscle_analysis_child.getElementsByTagName("end_time")[0].firstChild.nodeValue = round(time_range[-1],3)
 
 	with open(xml_setup_path, 'w') as xml_file:
 		dom.writexml(xml_file, addindent='\t', newl='\n', encoding='UTF-8')
