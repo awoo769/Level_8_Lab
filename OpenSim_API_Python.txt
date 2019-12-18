@@ -1,4 +1,4 @@
-Installing the OpenSim API for use with Python 3
+Installing the OpenSim 4.0 API for use with Python 3. NOTE: should not have to do this with OpenSim 4.1
 
 From https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python#ScriptinginPython-InstallingAnacondaandthe"opensim"Pythonpackage
 
