@@ -20,9 +20,6 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 	# Getting the joint crossed by a muscle
 	mus_name = osim_muscle.getName()
 	muscle_crossed_joint_list = get_joints_spanned_by_muscle(osim_model, mus_name)
-
-	# Create coordinate set
-	coordinate_set = osim_model.getCoordinateSet()
 	
 	# Index for effective DoFs
 	n_dof = 0
@@ -129,47 +126,58 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 	# (looping on all the dofs of each joint for all the joint crossed by the muscle).
 	# The model pose is updated via: " coordToUpd.setValue(currentState,setAngleDof)".
 	# The right dof to update is chosen via: "coordToUpd = osimModel.getCoordinateSet.get(n_instr)"
-
-	# Recursive for loops.
-	# 
-	# Currently just doing 1st one to see what is going on	
-
-	mus_output = []
-	n_instr = len(dof_index)
-
-	loop_rec(n_instr, set_angle_start_dof, set_limit_dof, deg_increm)
-
-	def loop_rec(n_instr: int, set_angle_start_dof: list, set_limit_dof: list, deg_increm: list, dof_index: list):
-		if n_instr >= 1:
-			for set_angle_dof in np.arange(set_angle_start_dof[n_instr], set_limit_dof[n_instr]+0.01,deg_increm[n_instr]):
-				coord_to_upd = osim_model.getCoordinateSet().get(dof_index[n_instr])
-				coord_to_upd.setValue(current_state, set_angle_dof)
-
-				loop_rec(n_instr - 1, set_angle_start_dof, set_limit_dof, deg_increm, dof_index)
-
-		else:
-			if muscle_quant == 'MLT':
-				
-			elif muscle_quant == 'LfibNorm':
-
-			elif muscle_quant == 'Lten':
-
-			elif muscle_quant == 'Ffib':
-
-			elif muscle_quant == 'all':
-
-		return mus_output
 	
-	
+	# Initialise nested for loops
+	string_to_execute_1 = ''
 
+	for n_instr in range(len(dof_index)):
+		tabs = ''
+		start_tab = ''
+		for _ in range(n_instr+1):
+			tabs = tabs + '\t'
+		for _ in range(n_instr):
+			start_tab = start_tab + '\t'
+			
+		string_to_execute_1 = (string_to_execute_1 + start_tab + 'for set_angle_dof' + str(n_instr+1) + 
+		' in np.arange(set_angle_start_dof['+ str(n_instr) + '], set_limit_dof['+ str(n_instr) + ']+0.01,deg_increm['
+		+ str(n_instr) + ']):\n' + tabs + 'coord_to_upd = osim_model.getCoordinateSet().get(dof_index['+ 
+		str(n_instr) + '])\n' + tabs + 'coord_to_upd.setValue(current_state, set_angle_dof' + str(n_instr+1) + ')\n\n')
+
+	# Calculate muscle length for the muscle
+	if muscle_quant == 'MTL':
+		muscle_output = []
+		string_to_execute_2 = (tabs + 'muscle_output.append(osim_muscle.getGeometryPath().getLength(current_state))')
+
+	elif muscle_quant == 'LfirNorm':
+		muscle_output = []
+		string_to_execute_2 = (tabs + 'osim_muscle.setActivation(current_state, 1.0)\n' + 
+		tabs + 'osim_model.equilibrateMuscles(current_state)\n' + 
+		tabs + 'muscle_output.append(osim_muscle.getNormalizedFiberLength(current_state))')
 		
+	elif muscle_quant == 'Lten':
+		muscle_output = []
+		string_to_execute_2 = (tabs + 'osim_muscle.setActivation(current_state, 1.0)\n' + 
+		tabs + 'osim_model.equilibrateMuscles(current_state)\n' + 
+		tabs + 'muscle_output.append(osim_muscle.getTendonLength(current_state))')
 
+	elif muscle_quant == 'Ffib':
+		muscle_output = []
+		string_to_execute_2 = (tabs + 'osim_muscle.setActivation(current_state, 1.0)\n' + 
+		tabs + 'osim_model.equilibrateMuscles(current_state)\n' + 
+		tabs + 'muscle_output.append(osim_muscle.getActiveFiberForce(current_state))')
 
+	elif muscle_quant == 'all':
+		# Set mus_name to have length 5
+		muscle_output = [[] for i in range(5)]
+		string_to_execute_2 = (tabs + 'osim_muscle.setActivation(current_state, 1.0)\n' + 
+		tabs + 'osim_model.equilibrateMuscles(current_state)\n' + 
+		tabs + 'muscle_output[0].append(osim_muscle.getGeometryPath().getLength(current_state))\n' + 
+		tabs + 'muscle_output[1].append(osim_muscle.getNormalizedFiberLength(current_state))\n' + 
+		tabs + 'muscle_output[2].append(osim_muscle.getTendonLength(current_state))\n' + 
+		tabs + 'muscle_output[3].append(osim_muscle.getActiveFiberForce(current_state))\n' + 
+		tabs + 'muscle_output[4].append(osim_muscle.getPennationAngle(current_state))')
 
-
-
-	strings_to_execute = []
-	#string_to_execute.append()
+	# Excecute strings to get muscle_output
+	exec(string_to_execute_1 + string_to_execute_2)
  
-
-	a = 1
+	return muscle_output
