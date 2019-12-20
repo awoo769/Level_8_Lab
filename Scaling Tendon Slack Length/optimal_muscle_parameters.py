@@ -1,9 +1,11 @@
 import opensim as osim
 import os
-from diary import Diary # Need to install diary - pip install diary
+import sys
 import numpy as np
 import scipy.linalg
 import scipy.optimize
+import time
+
 from sample_muscle_quantities import sample_muscle_quantities
 
 def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_filepath: str, N_eval: int, log_folder: str):
@@ -26,19 +28,21 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 	log_file = log_folder + "\\" + name + '_opt' + results_file_id_exp + ".log"
 
 	# Clean file (otherwise it appends)
-	fid = open(log_file, 'w+')
-	fid.close()
+	fid = open(log_file, 'w')
 
 	# Start a logger
-	logger = Diary(log_file)
+	old_stdout = sys.stdout
+
+	sys.stdout = fid
 
 	muscles = osim_model_ref.getMuscles()
 	muscles_scaled = osim_model_targ.getMuscles()
 
 	# Initialise with recognisable values
-	LmOptLts_opt = np.ones((muscles.getSize(), 2)) * -1000
+	LmOptLts_opt = np.ones((muscles.getSize(), 2)) * (-1000)
 
 	for n_mus in range(muscles.getSize()):
+		t = time.time()
 		# Current muscle name (here so it is possible to choose a single muscle when developing)
 		curr_muscle_name = muscles.get(n_mus).getName()
 		print('Processing mus %d: %s' % (n_mus, curr_muscle_name))
@@ -96,10 +100,10 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 		# Checking the results
 		if min(x) < 0:
 			# Inform the user
-			logger.log('Negative value estimated for muscle parameter of muscle ' + curr_muscle_name)
-			logger.log('                         Lm Opt        Lts')
-			logger.log('Template model       : ' + ' '.join(map(str,LmOptLts)))
-			logger.log('Optimized param      : ' + ' '.join(map(str,LmOptLts_opt[n_mus,:])))
+			print('Negative value estimated for muscle parameter of muscle ' + curr_muscle_name)
+			print('                       Lm Opt       Lts')
+			print('Template model       : ' + '\t\t'.join(map(str,LmOptLts)))
+			print('Optimized param      : ' + '\t\t'.join(map(str,LmOptLts_opt[n_mus,:])))
 
 			''' Implementing corrections if estimations are not correct '''
 
@@ -108,7 +112,7 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 			x = scipy.optimize.nnls(A,b)[0]
 			LmOptLts_opt[n_mus,:] = x
 
-			logger.log('Opt params (nnls): ' + str(LmOptLts_opt[n_mus,:]))
+			print('Opt params (nnls): ' + str(LmOptLts_opt[n_mus,:]))
 
 			# In our tests, if something goes wrong, it is generally the tendon slack length becoming
 			# negative or zero because the tendon length doesn't change throughout the range of motion, so 
@@ -116,7 +120,7 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 			if min(x) <= 0:
 				if max(np.array(mus_ref[2])[ok_list]) - min(np.array(mus_ref[2])[ok_list]) < 0.0001:
-					logger.log('Tendon length not changing throughout range of motion')
+					print('Tendon length not changing throughout range of motion')
 				
 				# Calculating proportion of tendon and fiber
 				Lten_fraction = np.array(mus_ref[2])[ok_list] / MTL_ref
@@ -150,20 +154,20 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 		# Update muscles from scaled model
 		curr_mus_scaled.setOptimalFiberLength(LmOptLts_opt[n_mus,0])
 		curr_mus_scaled.setTendonSlackLength(LmOptLts_opt[n_mus,1])
-				
 
+		# Print logs
+		print('  ')
+		print('Calculated optimized muscle parameters for ' + str(curr_muscle_name) + ' in ' + str(round(time.time() - t, 4)) + ' seconds.')
+		print('                       Lm Opt       Lts')
+		print('Template model       : ' + '\t\t'.join(map(str,np.around(LmOptLts, 4))))
+		print('Optimized param      : ' + '\t\t'.join(map(str,np.around(LmOptLts_opt[n_mus,:], 4))))
+		print('Nr of eval points    : ' + str(eval_ok_points) + '/' + str(eval_total_points) + ' used')
+		print('fval                 : ' + str(round(fval, 12)))
+		print('var from template [%]: ' + '\t\t'.join(map(str,np.around(100 * abs(LmOptLts - LmOptLts_opt[n_mus,:]) / LmOptLts, 4))) + '%')
+		print('  ')
 
-
-
-		
-		
-
-
-
-
-
-		a = 1
-
+	sys.stdout = old_stdout
+	fid.close()	
 
 
 optimal_muscle_parameters('C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\MSK_Models\\Reference_Hamner_L.osim',

@@ -54,7 +54,6 @@ def get_joints_spanned_by_muscle(osim_model: osim.Model, osim_muscle_name: str):
 		next_proximal_body_name = muscle_attach_bodies[-1 - counter]
 
 	# If not, body_name == proximal_body_name and the while loop will not be entered
-
 	while body_name != proximal_body_name:
 
 		# Work around because Body.getJoint() has been removed in OpenSim 4.0
@@ -64,11 +63,13 @@ def get_joints_spanned_by_muscle(osim_model: osim.Model, osim_muscle_name: str):
 				spanned_joint = joint
 				spanned_joint_name = str(spanned_joint.getName())
 
+				break
+
 		if spanned_joint_name == spanned_joint_name_old:
 			# Get the parent body. Parent frame naming in the form e.g., pelvis_offset
 			parent_name = spanned_joint.getParentFrame().getName().rsplit('_',1)[0] # Split 1 from the end
 			body = body_set.get(parent_name)
-			spanned_joint_name_old = spanned_joint
+			spanned_joint_name_old = spanned_joint_name
 
 		else:
 			if spanned_joint.numCoordinates() != 0:
@@ -81,7 +82,10 @@ def get_joints_spanned_by_muscle(osim_model: osim.Model, osim_muscle_name: str):
 			body = body_set.get(parent_name)
 
 		body_name = str(body.getName())
-		next_proximal_body_name = muscle_attach_bodies[-1 - counter]
+		# Increase counter by 1
+		counter = counter + 1
+		if counter < len(muscle_attach_bodies): # if counter == len(muscle_attach_bodies), will have reached end
+			next_proximal_body_name = muscle_attach_bodies[-1 - counter]
 
 	if len(joint_name_set) == 0:
 		print('No joint detected for muscle %s' % (muscle_name))
