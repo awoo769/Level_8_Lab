@@ -157,13 +157,13 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 		# Print logs
 		print('  ')
-		print('Calculated optimized muscle parameters for ' + str(curr_muscle_name) + ' in ' + str(round(time.time() - t, 4)) + ' seconds.')
+		print('Calculated optimized muscle parameters for ' + str(curr_muscle_name) + ' in ' + str(round(time.time() - t, 6)) + ' seconds.')
 		print('                       Lm Opt       Lts')
-		print('Template model       : ' + '\t\t'.join(map(str,np.around(LmOptLts, 4))))
-		print('Optimized param      : ' + '\t\t'.join(map(str,np.around(LmOptLts_opt[n_mus,:], 4))))
+		print('Template model       : ' + '\t\t'.join(map(str,np.around(LmOptLts, 6))))
+		print('Optimized param      : ' + '\t\t'.join(map(str,np.around(LmOptLts_opt[n_mus,:], 6))))
 		print('Nr of eval points    : ' + str(eval_ok_points) + '/' + str(eval_total_points) + ' used')
 		print('fval                 : ' + str(round(fval, 12)))
-		print('var from template [%]: ' + '\t\t'.join(map(str,np.around(100 * abs(LmOptLts - LmOptLts_opt[n_mus,:]) / LmOptLts, 4))) + '%')
+		print('var from template [%]: ' + '\t\t'.join(map(str,np.around(100 * abs(LmOptLts - LmOptLts_opt[n_mus,:]) / LmOptLts, 6))) + '%')
 		print('  ')
 
 	sys.stdout = old_stdout
@@ -172,5 +172,5 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 optimal_muscle_parameters('C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\MSK_Models\\Reference_Hamner_L.osim',
  'C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\MSK_Models\\Target_Hamner_scaled_L.osim',
-  5,
+  9,
    'C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\OptimModels')

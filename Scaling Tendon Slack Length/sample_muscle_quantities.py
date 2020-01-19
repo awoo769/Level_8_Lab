@@ -1,5 +1,5 @@
 import opensim as osim
-from get_joints_spanned_by_muscle import get_joints_spanned_by_muscle
+from get_joints_spanned_by_muscle_v2 import get_joints_spanned_by_muscle
 from get_indep_coord_and_joint import get_indep_coord_and_joint
 import numpy as np
 import math
@@ -19,7 +19,7 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 
 	# Getting the joint crossed by a muscle
 	mus_name = osim_muscle.getName()
-	muscle_crossed_joint_list = get_joints_spanned_by_muscle(osim_model, mus_name)
+	muscle_crossed_joint_list = get_joints_spanned_by_muscle(osim_model, current_state, mus_name)
 	
 	# Index for effective DoFs
 	n_dof = 0
