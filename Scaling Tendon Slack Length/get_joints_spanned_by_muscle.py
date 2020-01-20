@@ -1,100 +1,74 @@
 import opensim as osim
 import numpy as np
 
-def get_joints_spanned_by_muscle(osim_model: osim.Model, osim_muscle_name: str):
+def get_joints_spanned_by_muscle(osim_model: osim.Model, state: osim.State, osim_muscle_name: str):
+	'''
+	This function gets a list of the joints which a muscle spans, e.g., hip_l (l = left)
+
+	Function is based off the function getMuscleCoordinates() in plotMuscleFLCurves.m from the opensim-core MATLAB 
+	examples.
+
+	Author: Alex Woodall
+	Date: 20/01/2020
+	'''
 	
-	# Convert to string just in case muscle name is given as a java string
-	muscle_name = str(osim_muscle_name)
+	# Get a reference to the concrete muscle class
+	force = osim_model.getMuscles().get(osim_muscle_name)
+	muscle_class = str(force.getConcreteClassName())
 
-	# Useful initialisations
-	body_set = osim_model.getBodySet()
-	muscle = osim_model.getMuscles().get(muscle_name)
-
-	# Extracting the path point set via geometry path
-	muscle_path = muscle.getGeometryPath()
-	muscle_path_point_set = muscle_path.getPathPointSet()
-
-	# Get the attachment bodies
-	muscle_attach_bodies = []
-	muscle_attach_index = []
-
-	for n_point in range(muscle_path_point_set.getSize()):
-		# Get the current muscle point
-		current_attach_body = str(muscle_path_point_set.get(n_point).getBodyName())
-
-		# Initialise
-		if n_point == 0:
-			previous_attach_body = current_attach_body
-			muscle_attach_bodies.append(current_attach_body)
-			muscle_attach_index.append(body_set.getIndex(current_attach_body))
-
-		# Building vectors of the bodies attached to the muscles
-		if current_attach_body != previous_attach_body:
-			muscle_attach_bodies.append(current_attach_body)
-			muscle_attach_index.append(body_set.getIndex(current_attach_body))
-			previous_attach_body = current_attach_body
-
-	# From distal body checking the joint names going up until the desired opensim joint name is
-	# found or the proximal body is reached as parent body
-	distal_body_name = muscle_attach_bodies[-1]
-	body_name = distal_body_name
-	
-	proximal_body_name = muscle_attach_bodies[0]
-	body = body_set.get(distal_body_name)
-
-	spanned_joint_name_old = ''
-	no_dof_joint_set_name = []
+	# Initialise
+	nCoord = osim_model.getCoordinateSet().getSize()
+	muscle_coord = []
 	joint_name_set = []
 
-	joint_set = osim_model.getJointSet()
+	# Initialise the muscle variable. Semicolon is needed, otherwise returns None 
+	exec('muscle = osim.' + muscle_class + '.safeDownCast(force)');
+	
+	# Iterate through coordinates, finding nonzero moment arms
+	for k in range(nCoord):
+		# Get a reference to a coordinate
+		a_coord = osim_model.getCoordinateSet().get(k)
+		
+		# Get coordinate's max and min values
+		rMax = a_coord.getRangeMax()
+		rMin = a_coord.getRangeMin()
+		rDefault = a_coord.getDefaultValue()
 
-	# If there is more than one body attached to the body (which there should be)
-	if len(muscle_attach_bodies) > 1:
-		counter = 1
-		next_proximal_body_name = muscle_attach_bodies[-1 - counter]
+		# Define three points in the range to test the moment arm
+		total_range = rMax - rMin
 
-	# If not, body_name == proximal_body_name and the while loop will not be entered
-	while body_name != proximal_body_name:
+		p = []
+		p.append(rMin + total_range/2)
+		p.append(rMin + total_range/3)
+		p.append(rMin + 2*(total_range/3))
 
-		# Work around because Body.getJoint() has been removed in OpenSim 4.0
-		for joint in joint_set:
-			# Parent body of joint is the more proximal body to the current body
-			if next_proximal_body_name in joint.getParentFrame().getName():
-				spanned_joint = joint
-				spanned_joint_name = str(spanned_joint.getName())
+		for i in range(len(p)): # length will be 3
+			a_coord.setValue(state, p[i])
 
+			# Compute the moment arm of the muscle for this coordinate
+			moment_arm = locals()['muscle'].computeMomentArm(state, a_coord)
+
+			# Avoid false positives due to roundoff error
+			tol = 1e-6
+
+			if abs(moment_arm) > tol:
+				muscle_coord.append(k)
 				break
 
-		if spanned_joint_name == spanned_joint_name_old:
-			# Get the parent body. Parent frame naming in the form e.g., pelvis_offset
-			parent_name = spanned_joint.getParentFrame().getName().rsplit('_',1)[0] # Split 1 from the end
-			body = body_set.get(parent_name)
-			spanned_joint_name_old = spanned_joint_name
+		# Set the coordinate back to its original value
+		a_coord.setValue(state, rDefault)
 
-		else:
-			if spanned_joint.numCoordinates() != 0:
-				joint_name_set.append(spanned_joint_name)
-			else:
-				no_dof_joint_set_name.append(spanned_joint_name)
-			
-			spanned_joint_name_old = spanned_joint_name
-			parent_name = spanned_joint.getParentFrame().getName().rsplit('_',1)[0] # Split 1 from the end
-			body = body_set.get(parent_name)
+		# Cycle through each coordinate and get the joint associated with it.
+		for u in range(len(muscle_coord)):
+			# Get a reference to the coordinate
+			a_coord = osim_model.getCoordinateSet().get(muscle_coord[u])
 
-		body_name = str(body.getName())
-		# Increase counter by 1
-		counter = counter + 1
-		if counter < len(muscle_attach_bodies): # if counter == len(muscle_attach_bodies), will have reached end
-			next_proximal_body_name = muscle_attach_bodies[-1 - counter]
+			# Get the joint attached to the coordinate
+			joint = a_coord.getJoint().getName()
 
-	if len(joint_name_set) == 0:
-		print('No joint detected for muscle %s' % (muscle_name))
-	
-	if len(no_dof_joint_set_name) != 0:
-		for n_v in range(no_dof_joint_set_name):
-			print('Joint %s has no DoF.' % (no_dof_joint_set_name[n_v]))
-	
-	varargout = no_dof_joint_set_name
+			# Only add joint to the list if it is not already there
+			if joint not in joint_name_set:
+				joint_name_set.append(joint)
 
 	return joint_name_set
 

@@ -1,5 +1,5 @@
 import opensim as osim
-from get_joints_spanned_by_muscle_v2 import get_joints_spanned_by_muscle
+from get_joints_spanned_by_muscle import get_joints_spanned_by_muscle
 from get_indep_coord_and_joint import get_indep_coord_and_joint
 import numpy as np
 import math
@@ -60,7 +60,7 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 				constraint_coord_name = curr_coord_name
 
 				# Finding the independent coordinate
-				ind_coord_name, ind_coord_joint_name = get_indep_coord_and_joint(osim_model, constraint_coord_name)
+				ind_coord_name, [] = get_indep_coord_and_joint(osim_model, constraint_coord_name)
 			
 				# Updating the name to be saved in the list
 				curr_coord_name = ind_coord_name
@@ -107,9 +107,6 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 			
 			# Updating list index
 			n_dof = n_dof + 1
-
-	# Initialise the counter to save the results
-	counter = 1
 
 	# Assign an initial and a final value variable for each dof X, calling them
 	# set_angle_start_dof and set_limit_dof respectively
