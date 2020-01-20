@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 
@@ -35,19 +35,20 @@ Date: 20/01/2020
 '''
 
 # Import data
-acc = 
+acc = ...
 
 # Take the y component (vertical direction) and time
-y_acc = 
-time = 
+y_acc = acc[...]
+time = acc[...]
 
 # Filter data
 frequency = 500 # Arbitrary for now
-b, a = signal.butter(4, 5/(frequency/2), 'low')
+cut_off = 5
+b, a = signal.butter(4, cut_off/(frequency/2), 'low')
 filt_acc = signal.filtfilt(b, a, y_acc, axis=0)
 
 # Plot data for demonstration purposes
-plt.plot(t, filt_acc, label = 'vertical acceleration')
+plt.plot(time, filt_acc, label = 'vertical acceleration')
 plt.legend()
 plt.xlabel('time (s)')
 plt.ylabel('vertical acceleration (m/s^2)')
