@@ -1,1 +1,0 @@
-prepareTrialFromVicon("AB08","_12Mar_ss_12ms_01", "Output", 'InputDirectory')
