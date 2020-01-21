@@ -9,6 +9,28 @@ import time
 from sample_muscle_quantities import sample_muscle_quantities
 
 def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_filepath: str, N_eval: int, log_folder: str):
+	'''
+	Copyright (c) 2015 Modenese L., Ceseracciu, E., Reggiani M., Lloyd, D.G.                                                                        %
+ 	Licensed under the Apache License, Version 2.0 (the "License");         
+ 	You may not use this file except in compliance with the License.        
+ 	You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.                             
+                                                                          
+ 	Unless required by applicable law or agreed to in writing, software     
+ 	distributed under the License is distributed on an "AS IS" BASIS,       
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or         
+	implied. See the License for the specific language governing            
+	permissions and limitations under the License.                          
+                                                                         
+    Author:   Luca Modenese, January 2015                                
+    email:    l.modenese@sheffield.ac.uk                                  
+	----------------------------------------------------------------------- 
+
+	This function optimizes the muscle parameters as described in Modenese L, Ceseracciu E, Reggiani M, 
+	Lloyd DG (2015). Estimation of musculotendon parameters for scaled and subject specific musculoskeletal 
+	models using an optimization technique. Journal of Biomechanics (submitted) and prints the results to command 
+	window. Also it stores information about the optimization in the structure SimInfo.
+
+	'''
 
 	# Results file identifier
 	results_file_id_exp = '_N' + str(N_eval)
@@ -32,7 +54,6 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 	# Start a logger
 	old_stdout = sys.stdout
-
 	sys.stdout = fid
 
 	muscles = osim_model_ref.getMuscles()
@@ -40,6 +61,15 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 	# Initialise with recognisable values
 	LmOptLts_opt = np.ones((muscles.getSize(), 2)) * (-1000)
+
+	# Create lists for results dictionary
+	col_header = []
+	LmOptLts_ref_list = []
+	LmOptLts_opt_list = []
+	var_perc_lm_opts = []
+	sampled_eval_points = []
+	used_eval_points = []
+	fval_list = []
 
 	for n_mus in range(muscles.getSize()):
 		t = time.time()
@@ -166,11 +196,28 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 		print('var from template [%]: ' + '\t\t'.join(map(str,np.around(100 * abs(LmOptLts - LmOptLts_opt[n_mus,:]) / LmOptLts, 6))) + '%')
 		print('  ')
 
+		col_header.append(curr_mus.getName())
+		LmOptLts_ref_list.append(LmOptLts)
+		LmOptLts_opt_list.append(LmOptLts_opt[n_mus,:])
+		var_perc_lm_opts.append(100 * abs(LmOptLts - LmOptLts_opt[n_mus,:]) / LmOptLts)
+		sampled_eval_points.append(eval_ok_points)
+		used_eval_points.append(eval_total_points)
+		fval_list.append(fval)
+
 	sys.stdout = old_stdout
-	fid.close()	
+	fid.close()
 
+	# Simulation info and results
+	sim_info = {}
+	sim_info['colheader'] = col_header
+	sim_info['LmOptLts_ref'] = LmOptLts_ref_list
+	sim_info['LmOptLts_opt'] = LmOptLts_opt_list
+	sim_info['varPercLmOptLts'] = var_perc_lm_opts
+	sim_info['sampledEvalPoints'] = sampled_eval_points
+	sim_info['usedEvalPoints'] = used_eval_points
+	sim_info['fval'] = fval_list
 
-optimal_muscle_parameters('C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\MSK_Models\\Reference_Hamner_L.osim',
- 'C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\MSK_Models\\Target_Hamner_scaled_L.osim',
-  9,
-   'C:\\Users\\alexw\\Desktop\\MuscleParamOptimizer_ManuscriptPackage_04Jan2016\\Example1\\OptimModels')
+	# Assigning optimised model as output
+	osim_model_opt = osim_model_targ
+
+	return osim_model_opt, sim_info

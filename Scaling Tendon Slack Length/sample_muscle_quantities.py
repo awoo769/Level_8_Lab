@@ -145,7 +145,7 @@ def sample_muscle_quantities(osim_model: osim.Model, osim_muscle: osim.Muscle, m
 		muscle_output = []
 		string_to_execute_2 = (tabs + 'muscle_output.append(osim_muscle.getGeometryPath().getLength(current_state))')
 
-	elif muscle_quant == 'LfirNorm':
+	elif muscle_quant == 'LfibNorm':
 		muscle_output = []
 		string_to_execute_2 = (tabs + 'osim_muscle.setActivation(current_state, 1.0)\n' + 
 		tabs + 'osim_model.equilibrateMuscles(current_state)\n' + 
