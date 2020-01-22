@@ -69,6 +69,6 @@ for N_eval in range(5, 15+1):
 	n_Metrics = 10
 	results_musmapmetrics = assess_muscle_mapping(osim_model_ref, osim_model_opt, N_eval, n_Metrics, results_folder)
 	
-# Save simulation infos
+# Save simulation info
 with open(results_folder + "\\SimsInfo" + '.pckl', 'wb') as f:
 	pickle.dump([sims_info], f)
