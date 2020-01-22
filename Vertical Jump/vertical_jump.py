@@ -74,14 +74,6 @@ if g > 0:
 else:
 	filt_acc = filt_acc - g
 
-# Get number of jumps from user - potentially find this out automatically
-n_jumps = input('How many times did the person jump? ')
-try: 
-	n_jumps = int(n_jumps)
-except:
-	n_jumps = input('How many times did the person jump? Please enter a numerical digit. ')
-	n_jumps = int(n_jumps)
-
 # Plot data for demonstration purposes
 plt.plot(time, filt_acc, label = 'vertical acceleration')
 plt.legend()
@@ -91,22 +83,56 @@ plt.title('Entire trial')
 
 plt.show()
 
-# Get maximum points, for each jump there should be 2 siginficant peaks per jump
-maxima_ind = np.where(np.r_[True, filt_acc[1:] < filt_acc[:-1]] & np.r_[filt_acc[:-1] < filt_acc[1:], True] == True)
-
-n_peaks = 2 * n_jumps
-maxima_acc = filt_acc[maxima_ind].tolist()
+# Get minima points, for each jump there should be 2 siginficant peaks per jump
+minima_ind = np.where(np.r_[True, filt_acc[1:] < filt_acc[:-1]] & np.r_[filt_acc[:-1] < filt_acc[1:], True] == True)
+minima_acc = filt_acc[minima_ind].tolist()
 
 # Sort in decending order (largest first)
-maxima_acc.sort()
+minima_acc.sort()
 
+temp = minima_acc.copy()
+
+min_peak = min(temp)
+
+sig_mins = []
+sig_mins.append(min_peak)
+temp.remove(min_peak)
+
+for i in range(len(temp)):
+	delta = min_peak / temp[i]
+	if delta <= 4 and temp[i] < 0:
+		sig_mins.append(temp[i])
+
+n_jumps_est = int(np.floor(len(sig_mins) / 2))
+
+# Get number of jumps from user - potentially find this out automatically
+passed = 0
+
+if passed == 0:
+	query = input('Did the person jump ' + str(n_jumps_est) + ' times? [Y/N] ')
+
+	if query == 'Y' or 'y' or 'yes' or 'Yes':
+		n_jumps = n_jumps_est
+		passed = 1
+	elif query == 'N' or 'n' or 'no' or 'No':
+		n_jumps = input('How many times did the person jump? ')
+		try: 
+			n_jumps = int(n_jumps)
+		except:
+			n_jumps = input('How many times did the person jump? Please enter a numerical digit. ')
+			n_jumps = int(n_jumps)
+		passed = 1
+	else:
+		query = input('Please enter Y or N. Did the person jump ' + str(n_jumps_est) + ' times? [Y/N] ')
+
+n_peaks = 2 * n_jumps
 # First n_peaks are the important peaks
-maxima_jumps = maxima_acc[:n_peaks]
+minima_jumps = minima_acc[:n_peaks]
 
 # Get indicies of these peaks
 ind = []
 for i in range(n_peaks):
-	ind.append(np.where(filt_acc == maxima_jumps[i])[0][0])
+	ind.append(np.where(filt_acc == minima_jumps[i])[0][0])
 
 # Overlay plot
 # Plot data for demonstration purposes
