@@ -6,7 +6,11 @@ import tkinter as tk
 from tkinter import filedialog
 import csv
 
+from skinematics import imus
+
 import os
+
+from scipy import integrate
 
 '''
 This script will calculate the vertical jump height from data gathered by an IMU.
@@ -103,18 +107,47 @@ for i in range(len(temp)):
 	if delta <= 4 and temp[i] < 0:
 		sig_mins.append(temp[i])
 
-n_jumps_est = int(np.floor(len(sig_mins) / 2))
+# Each min point should be separated by a positive value (a jump or a rise at the end of a jump)
+final_min_points_ind = []
 
-# Get number of jumps from user - potentially find this out automatically
+# Get indices of sig_mins
+sig_mins_ind = []
+for i in range(len(sig_mins)):
+	sig_mins_ind.append(np.where(filt_acc == sig_mins[i])[0][0])
+
+sig_mins_ind.sort()
+
+tol = 0.2
+
+for i in range(len(sig_mins)):
+	if i == len(sig_mins) - 2:
+		if np.size(np.where(filt_acc[sig_mins_ind[i]:] > -tol)) > 0:
+			final_min_points_ind.append(sig_mins_ind[i])
+
+	elif i != len(sig_mins) - 1: # Not on the last minimum
+		# Test if there is a positive number between the two mins
+		if np.size(np.where(filt_acc[sig_mins_ind[i]:sig_mins_ind[i+1] + 1] > -tol)) > 0:
+			final_min_points_ind.append(sig_mins_ind[i])
+	else:
+		if np.size(np.where(filt_acc[sig_mins_ind[i-1]:sig_mins_ind[i] + 1] > -tol)) > 0:
+			final_min_points_ind.append(sig_mins_ind[i])
+
+n_jumps_est = int(np.floor(len(final_min_points_ind) / 2))
+
+plt.plot(time, filt_acc)
+plt.plot(time[final_min_points_ind], filt_acc[final_min_points_ind],'bo')
+plt.show()
+
+# Check if number of jumps estimate is correct with user
 passed = 0
 
 if passed == 0:
 	query = input('Did the person jump ' + str(n_jumps_est) + ' times? [Y/N] ')
 
-	if query == 'Y' or 'y' or 'yes' or 'Yes':
+	if query in ['Y', 'y', 'yes', 'Yes']:
 		n_jumps = n_jumps_est
 		passed = 1
-	elif query == 'N' or 'n' or 'no' or 'No':
+	elif query in ['N', 'n', 'no', 'No']:
 		n_jumps = input('How many times did the person jump? ')
 		try: 
 			n_jumps = int(n_jumps)
@@ -128,6 +161,9 @@ if passed == 0:
 n_peaks = 2 * n_jumps
 # First n_peaks are the important peaks
 minima_jumps = minima_acc[:n_peaks]
+
+''' Time of flight method '''
+print('Using time of flight method.')
 
 # Get indicies of these peaks
 ind = []
@@ -193,3 +229,35 @@ for i in range(n_jumps):
 	max_height = (g * flight_time * flight_time) / 8
 
 	print('Jump ' + str(i+1) + ' height = ' + str(np.round(max_height * 100, 2)) + ' cm.')
+
+''' Integration method '''
+print('Using integration method.')
+
+# This method involves double integrating the acceleration data to get displacement data.
+# Double integration will likely cause drift/numerical error
+
+# Re-zeroed acceleration data/and filtered
+a = filt_acc
+
+# Remove the mean
+a = a - np.mean(a)
+
+# Integrate to get velocity
+v = integrate.cumtrapz(y=a, x=time, initial=0.0)
+
+# Remove mean of velocity
+v = v - np.mean(v)
+
+# Integrate to get displacement
+s = integrate.cumtrapz(y=v, x=time, initial=0.0)
+
+
+plt.plot(time, a, label = 'vertical acceleration')
+plt.plot(time, v, label = 'vertical velocity')
+plt.plot(time, s, label = 'vertical displacement')
+plt.legend()
+plt.xlabel('time (s)')
+plt.ylabel('vertical acceleration (m/s^2)')
+plt.title('Entire trial')
+
+plt.show()
