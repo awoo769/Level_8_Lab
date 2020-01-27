@@ -6,8 +6,6 @@ import tkinter as tk
 from tkinter import filedialog
 import csv
 
-from skinematics import imus
-
 import os
 
 from scipy import integrate
@@ -46,7 +44,10 @@ Date: 20/01/2020
 
 # Import data
 root = tk.Tk()
+
+
 root.withdraw()
+
 file_path = filedialog.askopenfilename(initialdir = os.getcwd(),title = "Select file",filetypes = (("csv files","*.csv"),("all files","*.*")))
 
 acc = []
@@ -162,6 +163,7 @@ n_peaks = 2 * n_jumps
 # First n_peaks are the important peaks
 minima_jumps = minima_acc[:n_peaks]
 
+"""
 ''' Time of flight method '''
 print('Using time of flight method.')
 
@@ -229,7 +231,7 @@ for i in range(n_jumps):
 	max_height = (g * flight_time * flight_time) / 8
 
 	print('Jump ' + str(i+1) + ' height = ' + str(np.round(max_height * 100, 2)) + ' cm.')
-
+"""
 ''' Integration method '''
 print('Using integration method.')
 
@@ -251,13 +253,21 @@ v = v - np.mean(v)
 # Integrate to get displacement
 s = integrate.cumtrapz(y=v, x=time, initial=0.0)
 
-
-plt.plot(time, a, label = 'vertical acceleration')
-plt.plot(time, v, label = 'vertical velocity')
-plt.plot(time, s, label = 'vertical displacement')
-plt.legend()
-plt.xlabel('time (s)')
+ax1 = plt.subplot(311)
+plt.plot(time, a, 'r', label = 'vertical acceleration')
 plt.ylabel('vertical acceleration (m/s^2)')
-plt.title('Entire trial')
+plt.setp(ax1.get_xticklabels(), visible=False)
+
+ax2 = plt.subplot(312, sharex=ax1)
+plt.plot(time, v, 'g', label = 'vertical velocity')
+plt.ylabel('vertical velocity (m/s)')
+plt.setp(ax2.get_xticklabels(), visible=False)
+
+ax3 = plt.subplot(313, sharex=ax1)
+plt.plot(time, s, 'b', label = 'vertical displacement')
+plt.ylabel('vertical displacement (m)')
+
+#plt.legend()
+plt.xlabel('time (s)')
 
 plt.show()
