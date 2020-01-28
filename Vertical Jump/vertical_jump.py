@@ -44,8 +44,6 @@ Date: 20/01/2020
 
 # Import data
 root = tk.Tk()
-
-
 root.withdraw()
 
 file_path = filedialog.askopenfilename(initialdir = os.getcwd(),title = "Select file",filetypes = (("csv files","*.csv"),("all files","*.*")))
@@ -143,7 +141,10 @@ plt.show()
 passed = 0
 
 if passed == 0:
-	query = input('Did the person jump ' + str(n_jumps_est) + ' times? [Y/N] ')
+	if n_jumps_est == 1:
+		query = input('Did the person jump ' + str(n_jumps_est) + ' time? [Y/N] ')
+	else:
+		query = input('Did the person jump ' + str(n_jumps_est) + ' times? [Y/N] ')
 
 	if query in ['Y', 'y', 'yes', 'Yes']:
 		n_jumps = n_jumps_est
@@ -163,7 +164,7 @@ n_peaks = 2 * n_jumps
 # First n_peaks are the important peaks
 minima_jumps = minima_acc[:n_peaks]
 
-"""
+
 ''' Time of flight method '''
 print('Using time of flight method.')
 
@@ -231,12 +232,12 @@ for i in range(n_jumps):
 	max_height = (g * flight_time * flight_time) / 8
 
 	print('Jump ' + str(i+1) + ' height = ' + str(np.round(max_height * 100, 2)) + ' cm.')
-"""
+
 ''' Integration method '''
 print('Using integration method.')
 
 # This method involves double integrating the acceleration data to get displacement data.
-# Double integration will likely cause drift/numerical error
+# Double integration will cause drift/numerical error
 
 # Re-zeroed acceleration data/and filtered
 a = filt_acc
@@ -252,6 +253,7 @@ v = v - np.mean(v)
 
 # Integrate to get displacement
 s = integrate.cumtrapz(y=v, x=time, initial=0.0)
+s = s - np.mean(s)
 
 ax1 = plt.subplot(311)
 plt.plot(time, a, 'r', label = 'vertical acceleration')
@@ -267,7 +269,6 @@ ax3 = plt.subplot(313, sharex=ax1)
 plt.plot(time, s, 'b', label = 'vertical displacement')
 plt.ylabel('vertical displacement (m)')
 
-#plt.legend()
 plt.xlabel('time (s)')
 
 plt.show()
