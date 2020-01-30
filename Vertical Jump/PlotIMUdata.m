@@ -6,7 +6,7 @@ accData = IMUData(:,2:4);
 accx=accData(:,1);
 accy=accData(:,2);
 accz=accData(:,3);
-R = sqrt(accx.^2+accy.^2+accz.^2) 
+R = sqrt(accx.^2+accy.^2+accz.^2);
 
 figure; subplot(2,1,1); plot(time, R,'k'); 
 title('Resultant Acceleration')

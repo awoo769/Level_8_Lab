@@ -56,14 +56,27 @@ with open(file_path, newline='') as csvfile:
 		
 acc = np.array(acc)
 
+x_acc = acc[1:,1].astype(np.float)
+z_acc = acc[1:,3].astype(np.float)
+
 # Take the y component (vertical direction) and time (convert to float), assume movement only in the y direction
 y_acc = acc[1:,2].astype(np.float)
 time = acc[1:,0].astype(np.float)
 
+Res = np.sqrt(np.power(x_acc, 2) + np.power(y_acc, 2) + np.power(z_acc, 2))
+
+# Trim the first second of recording (ASSUME STILL FOR OVER 1 SECOND)
+Res = Res[500:]
+
+y_acc = y_acc[500:]
+time = time[500:]
+
 # Filter data
-frequency = 500 # Arbitrary for now
+frequency = 500
 cut_off = 5
 b, a = signal.butter(4, cut_off/(frequency/2), 'low')
+
+filt_res = signal.filtfilt(b, a, Res)
 filt_acc = signal.filtfilt(b, a, y_acc)
 
 # Rotate data and remove effect of gravity
@@ -191,6 +204,9 @@ ind.sort()
 first_peaks = ind[::2]
 second_peaks = ind[1::2]
 
+take_off_list = []
+touch_down_list = []
+
 for i in range(n_jumps):
 	''' Get take off and landing time '''
 
@@ -228,6 +244,9 @@ for i in range(n_jumps):
 
 	flight_time = time[touch_down_ind] - time[take_off_ind]
 
+	take_off_list.append(take_off_ind)
+	touch_down_list.append(touch_down_ind)
+
 	g = 9.81
 	max_height = (g * flight_time * flight_time) / 8
 
@@ -239,35 +258,70 @@ print('Using integration method.')
 # This method involves double integrating the acceleration data to get displacement data.
 # Double integration will cause drift/numerical error
 
-# Re-zeroed acceleration data/and filtered
-a = filt_acc
+def trapezoidal(t, y, initial=0):
+	res = np.zeros((np.shape(t)))
+	res[0] = initial
 
-# Remove the mean
-a = a - np.mean(a)
+	for i in range(len(t) - 1):
+		res[i+1] = res[i] + 1/2 * (t[i+1] - t[i]) * (y[i] + y[i+1])
+	
+	return res
+
+# Re-zeroed acceleration data/and filtered
+a = filt_acc.copy()
+
+# Filter data to remove drift
+frequency = 500
+cut_off = 0.3 # Play around with this. 0.3 Hz seems to work well for 1 jump
+d, c = signal.butter(4, cut_off/(frequency/2), 'high')
+
+a_filt = -signal.filtfilt(d, c, a)
 
 # Integrate to get velocity
-v = integrate.cumtrapz(y=a, x=time, initial=0.0)
+v = integrate.cumtrapz(y=a_filt, x=time, initial=0)
 
-# Remove mean of velocity
-v = v - np.mean(v)
+v_filt = signal.filtfilt(d, c, v)
 
 # Integrate to get displacement
-s = integrate.cumtrapz(y=v, x=time, initial=0.0)
-s = s - np.mean(s)
+s = integrate.cumtrapz(y=v_filt, x=time, initial=0)
 
+s_filt = signal.filtfilt(d, c, s)
+
+jump_height = []
+rough_mid_ind = []
+
+for i in range(n_jumps):
+	jump_height.append(max(s_filt[take_off_list[i]:touch_down_list[i]]))
+
+	print("Jump %d height = %0.2f cm" % (i+1, jump_height[i] * 100))
+
+	rough_mid_ind.append(int((touch_down_list[i] - take_off_list[i]) / 2 + take_off_list[i]))
+
+# Remove mean of displacement - do this after correcting drift (or don't do at all?)
 ax1 = plt.subplot(311)
-plt.plot(time, a, 'r', label = 'vertical acceleration')
+plt.plot(time, a_filt, 'r', label = 'vertical acceleration')
+plt.plot(time[take_off_list], a_filt[take_off_list],'o')
+plt.plot(time[touch_down_list], a_filt[touch_down_list],'o')
+plt.plot(time[rough_mid_ind], a_filt[rough_mid_ind],'o')
 plt.ylabel('vertical acceleration (m/s^2)')
 plt.setp(ax1.get_xticklabels(), visible=False)
 
 ax2 = plt.subplot(312, sharex=ax1)
-plt.plot(time, v, 'g', label = 'vertical velocity')
+plt.plot(time, v_filt, 'g', label = 'vertical velocity')
+plt.plot(time[take_off_list], v_filt[take_off_list],'o')
+plt.plot(time[touch_down_list], v_filt[touch_down_list],'o')
+plt.plot(time[rough_mid_ind], v_filt[rough_mid_ind],'o')
+
 plt.ylabel('vertical velocity (m/s)')
 plt.setp(ax2.get_xticklabels(), visible=False)
 
 ax3 = plt.subplot(313, sharex=ax1)
-plt.plot(time, s, 'b', label = 'vertical displacement')
-plt.ylabel('vertical displacement (m)')
+plt.plot(time, s_filt*100, 'b', label = 'vertical displacement')
+plt.plot(time[take_off_list], s_filt[take_off_list]*100,'o')
+plt.plot(time[touch_down_list], s_filt[touch_down_list]*100,'o')
+plt.plot(time[rough_mid_ind], s_filt[rough_mid_ind]*100,'o')
+
+plt.ylabel('vertical displacement (cm)')
 
 plt.xlabel('time (s)')
 

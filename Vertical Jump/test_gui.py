@@ -262,11 +262,11 @@ def initial_screen ():
 	global button1
 
 	label1 = tk.Label(root, text="Maximum Jump Height", font=('Arial',50), bg='grey20', fg='OrangeRed2', anchor="center")
-	label1.pack(ipady=50)
+	label1.pack(pady=100)
 
 	button1 = tk.Button(root, command=estimate_jumps, font=('Arial', 20), text="Select jump file", bg='OrangeRed2', fg='grey20', 
 						activebackground='grey20', activeforeground='OrangeRed2', borderwidth=0)
-	button1.pack()
+	button1.pack(pady=120)
 
 	return
 
