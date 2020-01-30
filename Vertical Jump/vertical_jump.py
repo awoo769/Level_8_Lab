@@ -258,21 +258,12 @@ print('Using integration method.')
 # This method involves double integrating the acceleration data to get displacement data.
 # Double integration will cause drift/numerical error
 
-def trapezoidal(t, y, initial=0):
-	res = np.zeros((np.shape(t)))
-	res[0] = initial
-
-	for i in range(len(t) - 1):
-		res[i+1] = res[i] + 1/2 * (t[i+1] - t[i]) * (y[i] + y[i+1])
-	
-	return res
-
 # Re-zeroed acceleration data/and filtered
 a = filt_acc.copy()
 
 # Filter data to remove drift
 frequency = 500
-cut_off = 0.3 # Play around with this. 0.3 Hz seems to work well for 1 jump
+cut_off = 0.5 # Play around with this. 0.3 Hz seems to work well for 1 jump
 d, c = signal.butter(4, cut_off/(frequency/2), 'high')
 
 a_filt = -signal.filtfilt(d, c, a)
