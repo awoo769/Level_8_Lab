@@ -63,32 +63,28 @@ z_acc = acc[1:,3].astype(np.float)
 y_acc = acc[1:,2].astype(np.float)
 time = acc[1:,0].astype(np.float)
 
-Res = np.sqrt(np.power(x_acc, 2) + np.power(y_acc, 2) + np.power(z_acc, 2))
-
 # Trim the first second of recording (ASSUME STILL FOR OVER 1 SECOND)
-Res = Res[500:]
 
 y_acc = y_acc[500:]
 time = time[500:]
 
 # Filter data
 frequency = 500
-cut_off = 5
+cut_off = 5 # Low-pass cut-off frequency set to 5 Hz, as used by Grainger et al (2019)
 b, a = signal.butter(4, cut_off/(frequency/2), 'low')
 
-filt_res = signal.filtfilt(b, a, Res)
-filt_acc = signal.filtfilt(b, a, y_acc)
+a_filt = signal.filtfilt(b, a, y_acc)
 
 # Rotate data and remove effect of gravity
 
 # Subject will be still for first part of trial, first 250 data points should do (0.5 s)
-g = np.mean(filt_acc[:251]) # This value should be near 9.81 (assuming movement only in y direction)
+g = np.mean(a_filt[:251]) # This value should be near 9.81 (assuming movement only in y direction)
 
 # Depending on calibration of sensor/rotation, positive acceleration may be positive or negative
 if g > 0:
-	filt_acc = -(filt_acc - g) # Remove effect of gravity and flip
+	filt_acc = -(a_filt - g) # Remove effect of gravity and flip
 else:
-	filt_acc = filt_acc - g
+	filt_acc = a_filt - g
 
 # Plot data for demonstration purposes
 plt.plot(time, filt_acc, label = 'vertical acceleration')
@@ -99,7 +95,7 @@ plt.title('Entire trial')
 
 plt.show()
 
-# Get minima points, for each jump there should be 2 siginficant peaks per jump
+# Get minima points, for each jump there should be 2 siginficant peaks
 minima_ind = np.where(np.r_[True, filt_acc[1:] < filt_acc[:-1]] & np.r_[filt_acc[:-1] < filt_acc[1:], True] == True)
 minima_acc = filt_acc[minima_ind].tolist()
 
@@ -258,29 +254,33 @@ print('Using integration method.')
 # This method involves double integrating the acceleration data to get displacement data.
 # Double integration will cause drift/numerical error
 
+# There are multiple methods to reduce drift.
+# 1) Use implicit integration (such as the trapezium rule)
+# 2) Use the "integration in two reference frames" concept - not implemented, yet.
+# 3) High-pass filter the integrated outputs. Luo et al (2013) used a high-pass filter with a cut-off frequency of
+# 0.5 Hz when removing drift from ECG signals. The acceleration data has already been low-pass filtered at 5 Hz
+
 # Re-zeroed acceleration data/and filtered
-a = filt_acc.copy()
+a_filt = -(filt_acc.copy())
 
 # Filter data to remove drift
 frequency = 500
-cut_off = 0.5 # Play around with this. 0.3 Hz seems to work well for 1 jump
-d, c = signal.butter(4, cut_off/(frequency/2), 'high')
-
-a_filt = -signal.filtfilt(d, c, a)
+cut_off = 0.5 # Play around with this.
+d, c = signal.butter(N=4, Wn=cut_off/(frequency/2), btype='high')
 
 # Integrate to get velocity
 v = integrate.cumtrapz(y=a_filt, x=time, initial=0)
-
-v_filt = signal.filtfilt(d, c, v)
+v_filt = signal.filtfilt(b=d, a=c, x=v)
 
 # Integrate to get displacement
 s = integrate.cumtrapz(y=v_filt, x=time, initial=0)
 
-s_filt = signal.filtfilt(d, c, s)
+s_filt = signal.filtfilt(b=d, a=c, x=s)
 
 jump_height = []
 rough_mid_ind = []
 
+# Get maximum height. Since centre of mass is zeroed, the maximum height will be the jump height.
 for i in range(n_jumps):
 	jump_height.append(max(s_filt[take_off_list[i]:touch_down_list[i]]))
 
@@ -307,10 +307,10 @@ plt.ylabel('vertical velocity (m/s)')
 plt.setp(ax2.get_xticklabels(), visible=False)
 
 ax3 = plt.subplot(313, sharex=ax1)
-plt.plot(time, s_filt*100, 'b', label = 'vertical displacement')
-plt.plot(time[take_off_list], s_filt[take_off_list]*100,'o')
-plt.plot(time[touch_down_list], s_filt[touch_down_list]*100,'o')
-plt.plot(time[rough_mid_ind], s_filt[rough_mid_ind]*100,'o')
+plt.plot(time, s_filt, 'b', label = 'vertical displacement')
+plt.plot(time[take_off_list], s_filt[take_off_list],'o')
+plt.plot(time[touch_down_list], s_filt[touch_down_list],'o')
+plt.plot(time[rough_mid_ind], s_filt[rough_mid_ind],'o')
 
 plt.ylabel('vertical displacement (cm)')
 
