@@ -4,12 +4,9 @@ import os
 import csv
 import numpy as np
 from scipy import signal
+from scipy import integrate
 import matplotlib
 import sys
-
-matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
 
 def restart():
 	label1.destroy()
@@ -17,9 +14,14 @@ def restart():
 
 	button4.destroy()
 
+	canvas.destroy()
+
 	for label in label3:
 		label.destroy()
 	
+	for label in label5:
+		label.destroy()
+
 	initial_screen()
 
 	return
@@ -53,16 +55,16 @@ def enter_jumps():
 
 	global label4
 	label4 = tk.Label(root, text='How many times did the person jump? (numerical value)', bg='grey20', fg='OrangeRed2', font=('Arial',20))
-	label4.pack()
+	label4.place(relx=0.5, rely=0.35, anchor="center")
 
 	global entry1
 	entry1 = tk.Entry(root, bg='OrangeRed2', fg='grey20', font=('Arial',20), borderwidth=0)
-	entry1.pack()
+	entry1.place(relx=0.5, rely=0.4, anchor="center")
 
 	global button5
 	button5 = tk.Button(root, text='Select', command=(lambda e = entry1: test_input(e)), font=('Arial', 20), bg='OrangeRed2', fg='grey20', activebackground='grey20',
 						activeforeground='OrangeRed2', borderwidth=0)
-	button5.pack()
+	button5.place(relx=0.5, rely=0.5, anchor="center")
 
 	return
 
@@ -90,6 +92,10 @@ def calculate_times():
 	global label3
 	label3 = []
 
+	# Use flight time
+	take_off_list = []
+	touch_down_list = []
+
 	for i in range(n_jumps):
 		''' Get take off and landing time '''
 
@@ -115,16 +121,72 @@ def calculate_times():
 
 		flight_time = time[touch_down_ind] - time[take_off_ind]
 
+		take_off_list.append(take_off_ind)
+		touch_down_list.append(touch_down_ind)
+
 		g = 9.81
 		max_height = (g * flight_time * flight_time) / 8
 
 		label3.append(tk.Label(root, text=('Jump Height = {:.2f} cm'.format(max_height * 100)), bg='grey20', fg='OrangeRed2', font=('Arial',20)))
-		label3[-1].pack()
+		label3[-1].place(relx=0.65, rely=0.35 + (i*0.05), anchor="center")
+
+	# Use integration
+	# Re-zeroed acceleration data/and filtered
+	a_filt = -(filt_acc.copy())
+
+	# Filter data to remove drift
+	frequency = 500
+	cut_off = 0.5 # Play around with this.
+	d, c = signal.butter(N=4, Wn=cut_off/(frequency/2), btype='high')
+
+	# Integrate to get velocity
+	v = integrate.cumtrapz(y=a_filt, x=time, initial=0)
+	v_filt = signal.filtfilt(b=d, a=c, x=v)
+
+	# Integrate to get displacement
+	s = integrate.cumtrapz(y=v_filt, x=time, initial=0)
+
+	s_filt = signal.filtfilt(b=d, a=c, x=s)
+
+	jump_height = []
+
+	global label5
+	label5 = []
+
+	# Get maximum height. Since centre of mass is zeroed, the maximum height will be the jump height.
+	for i in range(n_jumps):
+		jump_height.append(max(s_filt[take_off_list[i]:touch_down_list[i]]))
+
+		label5.append(tk.Label(root, text=('Jump Height = {:.2f} cm'.format(jump_height[i] * 100)), bg='grey20', fg='OrangeRed2', font=('Arial',20)))
+		label5[-1].place(relx=0.35, rely=0.35 + (i*0.05), anchor="center")
 
 	global button4
 	button4 = tk.Button(root, text='Restart', command=restart, font=('Arial', 20), bg='OrangeRed2', fg='grey20', activebackground='grey20',
 						activeforeground='OrangeRed2', borderwidth=0)
-	button4.pack()
+
+	# Set y placement depending on how many jumps were recorded (to avoid overlap)
+	if i >= 2:
+		y = 0.35 + (i*0.05) + 0.1
+
+	else:
+		y = 0.5
+
+	button4.place(relx=0.5, rely=y, anchor="center")
+
+	# Draw line between both outputs (time of flight and integration)
+
+	global canvas
+	# 0.6c is roughly the height of 1 label.
+	canvas = tk.Canvas(root, width='2c', height= str(0.6*(2*n_jumps-1)) + 'c', bg='grey20', bd=0, highlightthickness=0)
+
+	if int(n_jumps / 2) == n_jumps / 2: # Even number of jumps
+		middle = 0.35 + int(n_jumps / 2) * 0.05 - 0.05/2
+	else:
+		middle = 0.35 + int(n_jumps / 2) * 0.05
+
+	canvas.place(relx=0.5, rely=middle, anchor="center")
+
+	canvas.create_line('1c', 0, '1c', 10000, fill='OrangeRed2', dash=50, width=4)
 
 	return
 
@@ -154,6 +216,9 @@ def estimate_jumps():
 		global time
 		time = acc[1:,0].astype(np.float)
 
+		y_acc = y_acc[500:]
+		time = time[500:]
+
 		# Filter data
 		frequency = 500 # Arbitrary for now
 		cut_off = 5
@@ -171,21 +236,6 @@ def estimate_jumps():
 			filt_acc = -(filt_acc - g) # Remove effect of gravity and flip
 		else:
 			filt_acc = filt_acc - g
-
-		# Plot for interest - can remove
-		'''
-		fig = Figure(figsize=(6,6))
-		f = fig.add_subplot(111)
-		f.plot(t, filt_acc)
-
-		f.set_title("Your jump")
-		f.set_ylabel("Acceleration (m/s^2)")
-		f.set_xlabel("Time (s)")
-
-		canvas = FigureCanvasTkAgg(fig, root)
-		canvas.get_tk_widget().pack()
-		canvas.draw()
-		'''
 		
 		# Get minima points, for each jump there should be 2 siginficant peaks per jump
 		minima_ind = np.where(np.r_[True, filt_acc[1:] < filt_acc[:-1]] & np.r_[filt_acc[:-1] < filt_acc[1:], True] == True)
@@ -242,18 +292,18 @@ def estimate_jumps():
 			label2 = tk.Label(root, text=('Did the person jump ' + str(n_jumps_est) + ' time?'), bg='grey20', fg='OrangeRed2', font=('Arial',20))
 		else:
 			label2 = tk.Label(root, text=('Did the person jump ' + str(n_jumps_est) + ' times?'), bg='grey20', fg='OrangeRed2', font=('Arial',20))
-		label2.pack()
+		label2.place(relx=0.5, rely=0.35, anchor="center")
 
 		global button2
 		global button3
 
 		button2 = tk.Button(root, text='Yes', command= calculate_times, font=('Arial', 20), bg='OrangeRed2', fg='grey20', activebackground='grey20',
-							activeforeground='OrangeRed2', borderwidth=0)
-		button2.pack()
+							activeforeground='OrangeRed2', borderwidth=0, width=5)
+		button2.place(relx=0.46, rely=0.5, anchor="center")
 
 		button3 = tk.Button(root, text='No', command=enter_jumps, font=('Arial', 20), bg='OrangeRed2', fg='grey20', activebackground='grey20',
-							activeforeground='OrangeRed2', borderwidth=0)
-		button3.pack()
+							activeforeground='OrangeRed2', borderwidth=0, width=5)
+		button3.place(relx=0.54, rely=0.5, anchor="center")
 
 	return
 
@@ -262,25 +312,26 @@ def initial_screen ():
 	global button1
 
 	label1 = tk.Label(root, text="Maximum Jump Height", font=('Arial',50), bg='grey20', fg='OrangeRed2', anchor="center")
-	label1.pack(pady=100)
+	label1.place(relx=0.5, rely=0.2, anchor="center")
 
 	button1 = tk.Button(root, command=estimate_jumps, font=('Arial', 20), text="Select jump file", bg='OrangeRed2', fg='grey20', 
 						activebackground='grey20', activeforeground='OrangeRed2', borderwidth=0)
-	button1.pack(pady=120)
+	button1.place(relx=0.5, rely=0.5, anchor="center")
 
 	return
 
-root = tk.Tk()
-root.title("Maximum Jump Height")
+if __name__ == "__main__":
+	root = tk.Tk()
+	root.title("Maximum Jump Height")
 
-# Set fullscreen
-root.attributes('-fullscreen',True)
-root.bind("<F11>", lambda event: root.attributes('-fullscreen', not root.attributes('-fullscreen'))) # F11 toogles
-root.bind("<Escape>", lambda event: root.attributes('-fullscreen',False)) # Esc leaves fullscreen
+	# Set fullscreen
+	root.attributes('-fullscreen',True)
+	root.bind("<F11>", lambda event: root.attributes('-fullscreen', not root.attributes('-fullscreen'))) # F11 toogles
+	root.bind("<Escape>", lambda event: root.attributes('-fullscreen',False)) # Esc leaves fullscreen
 
-# Set background colour
-root.configure(bg='grey20')
+	# Set background colour
+	root.configure(bg='grey20')
 
-initial_screen()
+	initial_screen()
 
-root.mainloop()
+	root.mainloop()

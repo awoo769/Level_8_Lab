@@ -56,9 +56,6 @@ with open(file_path, newline='') as csvfile:
 		
 acc = np.array(acc)
 
-x_acc = acc[1:,1].astype(np.float)
-z_acc = acc[1:,3].astype(np.float)
-
 # Take the y component (vertical direction) and time (convert to float), assume movement only in the y direction
 y_acc = acc[1:,2].astype(np.float)
 time = acc[1:,0].astype(np.float)
@@ -288,7 +285,6 @@ for i in range(n_jumps):
 
 	rough_mid_ind.append(int((touch_down_list[i] - take_off_list[i]) / 2 + take_off_list[i]))
 
-# Remove mean of displacement - do this after correcting drift (or don't do at all?)
 ax1 = plt.subplot(311)
 plt.plot(time, a_filt, 'r', label = 'vertical acceleration')
 plt.plot(time[take_off_list], a_filt[take_off_list],'o')
