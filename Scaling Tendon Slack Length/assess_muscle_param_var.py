@@ -25,12 +25,15 @@ def assess_muscle_param_var(template_osim_model: osim.Model, optimised_osim_mode
 
 		if pref == 'n':
 			print('Loading existing file')
-			with open(res_file_name + '.pckl', 'rb') as f:
+			with open(results_folder + "\\" + res_file_name + '.pckl', 'rb') as f:
 				Results_MusVarMetrics = pickle.load(f)
 			return
 		
 		elif pref == 'y':
 			print('Re-evaluating muscle percentage variations.')
+
+	else:
+		print('Evaluating muscle percentage variations.')
 	
 	# Set up lists to be saved
 	colheaders = []
@@ -41,10 +44,12 @@ def assess_muscle_param_var(template_osim_model: osim.Model, optimised_osim_mode
 	Lopt_var_list = []
 	Lts_var_list = []
 
+	i = 0
 	for n_mus in range(muscles_ref.getSize()):
 		# Current muscle name
+		i += 1 # Increase counter by 1
 		curr_mus_name = muscles_ref.get(n_mus).getName()
-		print('Processing ' + curr_mus_name)
+		print('Processing muscle ' + str(i) + '/' + str(muscles_ref.getSize()) + ': ' + curr_mus_name)
 
 		# Extracting the current muscle from the two models
 		current_muscle_templ = muscles_ref.get(curr_mus_name)
@@ -62,6 +67,8 @@ def assess_muscle_param_var(template_osim_model: osim.Model, optimised_osim_mode
 		Lts_opt.append(current_muscle_optim.getTendonSlackLength())
 		Lopt_var_list.append(Lopt_var)
 		Lts_var_list.append(Lts_var)
+
+	print('\n') # New line for ease of reading
 	
 	Results_MusVarMetrics = {}
 

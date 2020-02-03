@@ -51,10 +51,7 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 
 	# Clean file (otherwise it appends)
 	fid = open(log_file, 'w')
-
-	# Start a logger
-	old_stdout = sys.stdout
-	sys.stdout = fid
+	fid.close()
 
 	muscles = osim_model_ref.getMuscles()
 	muscles_scaled = osim_model_targ.getMuscles()
@@ -71,11 +68,19 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 	used_eval_points = []
 	fval_list = []
 
+	i = 0
 	for n_mus in range(muscles.getSize()):
+
+		i += 1
 		t = time.time()
 		# Current muscle name (here so it is possible to choose a single muscle when developing)
 		curr_muscle_name = muscles.get(n_mus).getName()
-		print('Processing mus %d: %s' % (n_mus, curr_muscle_name))
+		print('Processing muscle ' + str(i) + '/' + str(muscles.getSize()) + ': ' + curr_muscle_name)
+
+		# Start a logger
+		fid = open(log_file, 'a') # Open and append to
+		old_stdout = sys.stdout
+		sys.stdout = fid
 
 		# Import muscles
 		curr_mus = muscles.get(n_mus)
@@ -204,8 +209,11 @@ def optimal_muscle_parameters(osim_model_ref_filepath: str, osim_model_target_fi
 		used_eval_points.append(eval_total_points)
 		fval_list.append(fval)
 
-	sys.stdout = old_stdout
-	fid.close()
+		# Close the logger
+		sys.stdout = old_stdout
+		fid.close()
+
+	print('\n') # New line for ease of reading
 
 	# Simulation info and results
 	sim_info = {}

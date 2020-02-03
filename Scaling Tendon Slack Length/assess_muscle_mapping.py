@@ -33,12 +33,15 @@ def assess_muscle_mapping(template_osim_model: osim.Model, optimised_osim_model:
 
 		if pref == 'n':
 			print('Loading existing file')
-			with open(res_file_name + '.pckl', 'rb') as f:
+			with open(results_folder + "\\" + res_file_name + '.pckl', 'rb') as f:
 				Results_MusMapMetrics = pickle.load(f)
 			return
 		
 		elif pref == 'y':
 			print('Re-evaluating mapping results.')
+
+	else:
+		print('Evaluating mapping results.')
 	
 	# Set up lists to be saved
 	colheaders = []
@@ -49,10 +52,13 @@ def assess_muscle_mapping(template_osim_model: osim.Model, optimised_osim_model:
 	StandDevPercError = []
 	corrCoeff = []
 
+	i = 0
 	for n_mus in range(muscles_ref.getSize()):
+		i += 1 # increase counter by 1
+		curr_mus_name = 'ext_hal_l'
 		# Current muscle name
 		curr_mus_name = muscles_ref.get(n_mus).getName()
-		print('Processing ' + curr_mus_name)
+		print('Processing muscle ' + str(i) + '/' + str(muscles_ref.getSize()) + ': ' + curr_mus_name)
 
 		# Extracting the current muscle from the two models
 		current_muscle_templ = muscles_ref.get(curr_mus_name)
@@ -127,6 +133,8 @@ def assess_muscle_mapping(template_osim_model: osim.Model, optimised_osim_model:
 		del Lm_Norm_ref
 		del Lm_Norm_opt
 
+	print('\n') # New line for ease of reading
+
 	Results_MusMapMetrics = {}
 	Results_MusMapMetrics['colheaders'] = colheaders
 	Results_MusMapMetrics['RMSE'] = RMSE
@@ -156,9 +164,9 @@ def assess_muscle_mapping(template_osim_model: osim.Model, optimised_osim_model:
 
 	# Computing min and max variations for MaxPercError
 	MaxPercError_max = max(MeanPercError)
-	ind_max = MeanPercError.index(max(MaxPercError))
+	ind_max = MeanPercError.index(max(MeanPercError))
 	MaxPercError_min = min(MaxPercError)
-	ind_min = MeanPercError.index(min(MaxPercError))
+	ind_min = MeanPercError.index(min(MeanPercError))
 
 	Results_MusMapMetrics['MeanPercError_range'] = [MaxPercError_min, MaxPercError_max]
 	Results_MusMapMetrics['MeanPercError_range_mus'] = [colheaders[ind_min], colheaders[ind_max]]
@@ -171,16 +179,3 @@ def assess_muscle_mapping(template_osim_model: osim.Model, optimised_osim_model:
 		pickle.dump([Results_MusMapMetrics], f)
 
 	return Results_MusMapMetrics
-
-	
-
-
-
-
-	
-
-	# Save dictionary with results
-	#with open(results_folder + "\\" + res_file_name + '.pckl', 'wb') as f:
-#		pickle.dump([Results_MusVarMetrics], f)
-
-	#return Results_MusVarMetrics

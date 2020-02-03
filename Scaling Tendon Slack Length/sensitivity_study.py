@@ -2,6 +2,8 @@ import numpy as np
 import os
 import opensim as osim
 import pickle
+import sys
+
 
 from optimal_muscle_parameters import optimal_muscle_parameters
 from assess_muscle_param_var import assess_muscle_param_var

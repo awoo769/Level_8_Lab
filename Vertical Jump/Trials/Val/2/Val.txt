@@ -1,0 +1,7 @@
+Time start = 6.20 s (6.66 s)
+Time end   = 7.05 s (7.16 s)
+
+Difference = 0.5 s (close enough)
+
+Start height = 
+Max height = 
