@@ -110,7 +110,7 @@ for s in range(np.shape(subject_data)[0]):
 				tmp_index = [j for j in range(len(all_muscles_names_cut)) if all_muscles_names_cut[j] == curr_mus_name]
 				curr_muscle_name_index.append(tmp_index[:int(len(tmp_index)/2)])
 				
-		frac_of_group[i,0] = old_value[i]/sum(old_value[curr_muscle_name_index])
+		frac_of_group[i,0] = old_value[i,0]/np.sum(old_value[np.array(tuple(curr_muscle_name_index))])
 
 	''' Calculate the new maximal isometric muscle forces '''
 	specific_tension = 61 # N/cm^2 from Zajac 1989
