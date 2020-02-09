@@ -20,12 +20,15 @@ for i in range(len(data_files)):
 	a_y_ankle_l = (np.array(read_file)[:,6]).astype(np.float) # 7th column
 	a_z_ankle_l = (np.array(read_file)[:,7]).astype(np.float) # 8th column
 
+	R_ankle_l = np.sqrt(np.power(a_x_ankle_l, 2) + np.power(a_y_ankle_l, 2) + np.power(a_z_ankle_l, 2))
+
 	# Filter data at 5 Hz
 	frequency = 50
-	cut_off = 5 # Low-pass cut-off frequency set to 5 Hz, as used by Grainger et al (2019)
+	cut_off = 10 # Running occurs in the 10 Hz to 30 Hz range
 	b, a = signal.butter(4, cut_off/(frequency/2), 'low')
 
 	a_filt = signal.filtfilt(b, a, a_y_ankle_l)
+	R_filt = signal.filtfilt(b, a, R_ankle_l)
 
 	label = (np.array(read_file)[:,-1]).tolist()
 
@@ -39,7 +42,7 @@ for i in range(len(data_files)):
 	standing_still_end = label.index('2') - 1
 
 	#plt.plot(a_x_ankle_l,'r', label='x')
-	plt.plot(a_filt[standing_still_start:standing_still_end+1],'g', label='y')
+	plt.plot(R_filt[running_start:running_end+1],'g', label='y')
 	#plt.plot(a_z_ankle_l,'b', label='z')
 	
 	plt.legend()
