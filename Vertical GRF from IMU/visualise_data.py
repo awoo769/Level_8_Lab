@@ -2,64 +2,73 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from scipy import signal
+import csv
 
 # Read in file
-data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\MHEALTHDATASET'
+data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\Run30.csv'
 
-data_files = [f for f in os.listdir(data_directory) if (os.path.isfile(os.path.join(data_directory, f)) and '.log' in f)]
-
-for i in range(len(data_files)):
-	fid = open(os.path.join(data_directory, data_files[i]), 'r')
+with open(data_directory, 'r') as csvfile:
+	reader = csv.reader(csvfile, delimiter=',')
 
 	read_file = []
-	for line in fid:
-		line = line.rstrip("\r\n")
-		read_file.append(line.split('\t'))
-
-	a_x_ankle_l = (np.array(read_file)[:,5]).astype(np.float) # 6th column
-	a_y_ankle_l = (np.array(read_file)[:,6]).astype(np.float) # 7th column
-	a_z_ankle_l = (np.array(read_file)[:,7]).astype(np.float) # 8th column
-
-	R_ankle_l = np.sqrt(np.power(a_x_ankle_l, 2) + np.power(a_y_ankle_l, 2) + np.power(a_z_ankle_l, 2))
-
-	# Filter data at 5 Hz
-	frequency = 50
-	cut_off = 10 # Running occurs in the 10 Hz to 30 Hz range
-	b, a = signal.butter(4, cut_off/(frequency/2), 'low')
-
-	ay_filt = signal.filtfilt(b, a, a_y_ankle_l)
-	ax_filt = signal.filtfilt(b, a, a_x_ankle_l)
-	az_filt = signal.filtfilt(b, a, a_z_ankle_l)
-	R_filt = signal.filtfilt(b, a, R_ankle_l)
-
-	label = (np.array(read_file)[:,-1]).tolist()
-
-	standing_still_start = label.index('1')
-	standing_still_end = len(label) - 1 - label[::-1].index('1')
-
-	# Shift by average acceleration during standing still phase
-	gx = np.mean(ax_filt[standing_still_start:standing_still_end+1])
-	gy = np.mean(ay_filt[standing_still_start:standing_still_end+1])
-	gz = np.mean(az_filt[standing_still_start:standing_still_end+1])
-	gR = np.mean(R_filt[standing_still_start:standing_still_end+1])
-
-	ax_filt = ax_filt - gx
-	ay_filt = ay_filt - gy
-	az_filt = az_filt - gz
-	R_filt = R_filt - gR
-
-	# Each activity in the dataset has 3071 points
-	# Jogging = L10, running = L11, data is recorded at 50 Hz. 1 both jogging and running were performed for 1 minute each
-	jogging_start = label.index('10')
-	jogging_end = len(label) - 1 - label[::-1].index('10')
-
-	running_start = label.index('11')
-	running_end = len(label) - 1 - label[::-1].index('11')
-
-	#plt.plot(ax_filt[running_start+1500:running_start+1601],'r', label='x')
-	plt.plot(ay_filt[running_start+1500:running_start+1601],'g', label='y')
-	#plt.plot(az_filt[running_start+1500:running_start+1601],'b', label='z')
-	#plt.plot(R_filt[running_start+1500:running_start+1601], 'k', label='resultant')
+	i = 0
 	
-	plt.legend()
-	plt.show()
+	for row in reader:
+		i += 1
+
+		# First data row on line 8
+		if i >= 8:
+			if len(row) != 0:
+				read_file.append(row)
+
+# Participant running with both legs on force plate 1.
+# Take data from the right
+
+time = (np.array(read_file)[:,0]).astype(np.float) # 1st column
+a_x_ankle = (np.array(read_file)[:,4]).astype(np.float) # 5th column
+a_y_ankle = (np.array(read_file)[:,5]).astype(np.float) # 6th column
+a_z_ankle = (np.array(read_file)[:,6]).astype(np.float) # 7th column
+
+# Also take force plate data for comparison
+grf_x = (np.array(read_file)[:,1]).astype(np.float) # 2nd column
+grf_y = (np.array(read_file)[:,2]).astype(np.float) # 3rd column
+grf_z = (np.array(read_file)[:,3]).astype(np.float) # 4th column
+
+# Filter data at 5 Hz
+frequency = 1000
+cut_off = 30 # Running occurs in the 10 Hz to 30 Hz range
+b, a = signal.butter(4, cut_off/(frequency/2), 'low')
+
+ax_filt = signal.filtfilt(b, a, a_x_ankle)
+ay_filt = signal.filtfilt(b, a, a_y_ankle)
+az_filt = signal.filtfilt(b, a, a_z_ankle)
+R_ankle = np.sqrt(np.power(ax_filt, 2) + np.power(ay_filt, 2) + np.power(az_filt, 2))
+
+Fx_filt = signal.filtfilt(b, a, grf_x)
+Fy_filt = signal.filtfilt(b, a, grf_y)
+Fz_filt = signal.filtfilt(b, a, grf_z)
+R_F = np.sqrt(np.power(Fx_filt, 2) + np.power(Fy_filt, 2) + np.power(Fz_filt, 2))
+
+# Flip vertical forces
+Fz_filt = -Fz_filt
+
+# Find when the vertical forces drop below threshold, and then make all of the forces and CoP values 0.0 at these points.
+force_threshold = 20 # Set this to 20 N
+
+# Find the indices where the vertical force is below our threshold
+force_zero = np.where(Fz_filt < force_threshold)
+
+# Set these values to 0
+Fx_filt[force_zero] = 0.0
+Fy_filt[force_zero] = 0.0
+Fz_filt[force_zero] = 0.0
+R_F[force_zero] = 0.0
+
+plt.plot(time, ax_filt,'r', label='x')
+plt.plot(time, ay_filt,'g', label='y')
+plt.plot(time, az_filt,'b', label='z')
+#plt.plot(time,R_F,'r',label='reactant')
+plt.xlabel('Time (s)')
+plt.ylabel('Force (N)')
+plt.legend()
+plt.show()
