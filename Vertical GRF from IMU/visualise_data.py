@@ -5,7 +5,7 @@ from scipy import signal
 import csv
 
 # Read in file
-data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\Run30.csv'
+data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\DataforSonia\\0128run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -22,7 +22,6 @@ with open(data_directory, 'r') as csvfile:
 				read_file.append(row)
 
 # Participant running with both legs on force plate 1.
-# Take data from the right
 
 time = (np.array(read_file)[:,0]).astype(np.float) # 1st column
 
@@ -42,9 +41,10 @@ grf_y = (np.array(read_file)[:,2]).astype(np.float) # 3rd column
 grf_z = (np.array(read_file)[:,3]).astype(np.float) # 4th column
 
 # Filter data at 5 Hz
-frequency = 1000
+analog_frequency = 1000
 cut_off = 25 # Weyand (2017)
-b, a = signal.butter(4, cut_off/(frequency/2), 'low')
+order = 4 # Weyand (2017)
+b, a = signal.butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
 
 ax_filt_l = signal.filtfilt(b, a, a_x_ankle_l)
 ay_filt_l = signal.filtfilt(b, a, a_y_ankle_l)
@@ -76,11 +76,21 @@ Fy_filt[force_zero] = 0.0
 Fz_filt[force_zero] = 0.0
 R_F[force_zero] = 0.0
 
+'''
+# Find out whether the first step is with the left or right foot.
+plt.plot(time,ax_filt_l,'b', label='Left ankle')
+plt.plot(time,-ax_filt_r,'r', label='Right ankle')
+plt.legend()
+plt.xlabel('Time (s)')
+plt.ylabel('x acceleration (mm/s^2)')
+plt.show()
+'''
+
 # Assuming z is vertical direction
 heel_strike = []
 toe_off = []
 
-# First step is left.
+# First step is left. - we don't know this yet
 
 for i in range(1, len(Fz_filt)-1):
 	if Fz_filt[i-1] == 0 and Fz_filt[i] != 0: 
@@ -88,6 +98,29 @@ for i in range(1, len(Fz_filt)-1):
 	
 	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 		toe_off.append(i+1)
+
+# Find out whether the first step is with the left or right foot.
+
+
+fig, ax1 = plt.subplots()
+ax1.plot(time,R_ankle_l,'b', label='Left ankle')
+ax1.plot(time,R_ankle_r,'r', label='Right ankle')
+
+ax1.vlines(x=time[heel_strike], ymin=-100, ymax=100, colors='g', label='Heel strike')
+ax1.vlines(x=time[toe_off], ymin=-100, ymax=100, colors='y', label='Toe off')
+
+ax1.set_xlabel('Time (s)')
+ax1.set_ylabel('x acceleration (mm/s^2)')
+
+ax2 = ax1.twinx()
+ax2.plot(time,Fz_filt,'k', label='Fz')
+ax2.set_ylabel('Vertical force (N)')
+
+fig.tight_layout()
+
+plt.legend()
+plt.show()
+
 
 # Left = every odd
 heel_strike_l = heel_strike[0::2]
@@ -97,19 +130,22 @@ toe_off_l = toe_off[0::2]
 heel_strike_r = heel_strike[1::2]
 toe_off_r = toe_off[1::2]
 
-plt.plot(time, ax_filt_l,'k', label='x')
+plt.plot(time, ax_filt_r,'r', label='x')
+#plt.plot(time, ay_filt_r,'g', label='y')
+#plt.plot(time, az_filt_r,'b', label='z')
 #lt.plot(time, R_ankle_l,'k', label='resultant')
 #plt.plot(time, az_filt_l,'k', label='z')
 #plt.plot(time,Fz_filt,'b',label='Fz_filt')
 
 #plt.plot(time,Fz_filt,'r')
-plt.plot(time[heel_strike_l], ax_filt_l[heel_strike_l],'ob', label='heel strike')
-plt.plot(time[toe_off_l], ax_filt_l[toe_off_l],'og', label='toe off')
+plt.plot(time[heel_strike_r], ax_filt_r[heel_strike_r],'ob', label='heel strike')
+plt.plot(time[toe_off_r], ax_filt_r[toe_off_r],'og', label='toe off')
 plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (mm/s^2)')
 plt.legend()
 plt.show()
 
+# Left
 # Find all maximas and minimas of x acceleration
 maximas_ind = np.where(np.r_[True, ax_filt_l[1:] > ax_filt_l[:-1]] & np.r_[ax_filt_l[:-1] > ax_filt_l[1:], True] == True)[0]
 maximas_acc = ax_filt_l[maximas_ind].tolist()
@@ -134,7 +170,6 @@ sig_maxs_ind = []
 for i in range(len(sig_maxs)):
 	sig_maxs_ind.append(np.where(ax_filt_l == sig_maxs[i])[0][0])
 
-# Order minima
 minimas_ind = np.where(np.r_[True, ax_filt_l[1:] < ax_filt_l[:-1]] & np.r_[ax_filt_l[:-1] < ax_filt_l[1:], True] == True)[0]
 minimas_acc = ax_filt_l[minimas_ind].tolist()
 
@@ -203,6 +238,106 @@ for i in range(len(sig_maxs_ind)):
 plt.plot(time, ax_filt_l,'k')
 plt.plot(time[ind_HS], ax_filt_l[ind_HS], 'ob', label='heel strike')
 plt.plot(time[ind_TO], ax_filt_l[ind_TO], 'og', label='toe off')
+
+plt.xlabel('Time (s)')
+plt.ylabel('Acceleration (mm/s^2)')
+plt.legend()
+plt.show()
+
+
+# Right
+# Find all maximas and minimas of x acceleration
+maximas_ind = np.where(np.r_[True, ax_filt_r[1:] > ax_filt_r[:-1]] & np.r_[ax_filt_r[:-1] > ax_filt_r[1:], True] == True)[0]
+maximas_acc = ax_filt_r[maximas_ind].tolist()
+
+maximas_acc.sort(reverse=True)
+temp = maximas_acc.copy()
+
+max_maxima = max(maximas_acc)
+
+# All accepted maximas should not be less than 1/2 of the highest
+sig_maxs = []
+sig_maxs.append(max_maxima)
+temp.remove(max_maxima)
+
+for i in range(len(temp)):
+	delta = max_maxima / temp[i]
+	if delta <= 2 and temp[i] > 0:
+		sig_maxs.append(temp[i])
+
+# Get indices
+sig_maxs_ind = []
+for i in range(len(sig_maxs)):
+	sig_maxs_ind.append(np.where(ax_filt_r == sig_maxs[i])[0][0])
+
+minimas_ind = np.where(np.r_[True, ax_filt_r[1:] < ax_filt_r[:-1]] & np.r_[ax_filt_r[:-1] < ax_filt_r[1:], True] == True)[0]
+minimas_acc = ax_filt_r[minimas_ind].tolist()
+
+minimas_acc.sort()
+temp = minimas_acc.copy()
+
+min_minima = min(minimas_acc)
+
+# All accepted maximas should not be less than 1/2 of the highest
+sig_mins = []
+sig_mins.append(min_minima)
+temp.remove(min_minima)
+
+for i in range(len(temp)):
+	delta = min_minima / temp[i]
+	if delta <= 2 and temp[i] < 0:
+		sig_mins.append(temp[i])
+
+# Get indices
+sig_mins_ind = []
+for i in range(len(sig_mins)):
+	sig_mins_ind.append(np.where(ax_filt_r == sig_mins[i])[0][0])
+
+# For each minima, find the minima previous to it. This will be heel strike
+ind_HS = []
+
+for i in range(len(sig_mins_ind)):
+	ind_temp = sig_mins_ind[i]
+
+	# Get all mins previous to the current indice
+	minimas_less = minimas_ind[minimas_ind < ind_temp].tolist()
+
+	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
+	minimas_less.sort(reverse=True)
+
+	flag = 0
+	j = 0
+	while flag == 0:
+		if ax_filt_r[minimas_less[j]] < 0:
+			ind_HS.append(minimas_less[j])
+			flag = 1
+		else:
+			j += 1
+
+# For each maxima, find the maxima after it. This will be toe off
+ind_TO = []
+
+for i in range(len(sig_maxs_ind)):
+	ind_temp = sig_maxs_ind[i]
+
+	# Get all maxs after the current indice
+	maximas_greater = maximas_ind[maximas_ind > ind_temp].tolist()
+
+	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
+	maximas_greater.sort()
+
+	flag = 0
+	j = 0
+	while flag == 0:
+		if ax_filt_r[maximas_greater[j]] > 0:
+			ind_TO.append(maximas_greater[j])
+			flag = 1
+		else:
+			j += 1
+	
+plt.plot(time, ax_filt_r,'k')
+plt.plot(time[ind_HS], ax_filt_r[ind_HS], 'ob', label='heel strike')
+plt.plot(time[ind_TO], ax_filt_r[ind_TO], 'og', label='toe off')
 
 plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (mm/s^2)')
