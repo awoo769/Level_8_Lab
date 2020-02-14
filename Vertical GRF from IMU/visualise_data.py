@@ -5,7 +5,7 @@ from scipy import signal
 import csv
 
 # Read in file
-data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\DataforSonia\\0128run2.csv'
+data_directory = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\DataforSonia\\0102run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -40,7 +40,7 @@ grf_x = (np.array(read_file)[:,1]).astype(np.float) # 2nd column
 grf_y = (np.array(read_file)[:,2]).astype(np.float) # 3rd column
 grf_z = (np.array(read_file)[:,3]).astype(np.float) # 4th column
 
-# Filter data at 5 Hz
+# Filter data at 25 Hz
 analog_frequency = 1000
 cut_off = 25 # Weyand (2017)
 order = 4 # Weyand (2017)
@@ -51,10 +51,14 @@ ay_filt_l = signal.filtfilt(b, a, a_y_ankle_l)
 az_filt_l = signal.filtfilt(b, a, a_z_ankle_l)
 R_ankle_l = np.sqrt(np.power(ax_filt_l, 2) + np.power(ay_filt_l, 2) + np.power(az_filt_l, 2))
 
+Rxz_ankle_l = np.sqrt(np.power(ax_filt_l, 2) + np.power(az_filt_l, 2))
+
 ax_filt_r = signal.filtfilt(b, a, a_x_ankle_r)
 ay_filt_r = signal.filtfilt(b, a, a_y_ankle_r)
 az_filt_r = signal.filtfilt(b, a, a_z_ankle_r)
 R_ankle_r = np.sqrt(np.power(ax_filt_r, 2) + np.power(ay_filt_r, 2) + np.power(az_filt_r, 2))
+
+Rxz_ankle_r = np.sqrt(np.power(ax_filt_r, 2) + np.power(az_filt_r, 2))
 
 Fx_filt = signal.filtfilt(b, a, grf_x)
 Fy_filt = signal.filtfilt(b, a, grf_y)
@@ -92,6 +96,7 @@ toe_off = []
 
 # First step is left. - we don't know this yet
 
+# Get the points where there is force applied to the force plate (stance phase). Beginning = HS, end = TO
 for i in range(1, len(Fz_filt)-1):
 	if Fz_filt[i-1] == 0 and Fz_filt[i] != 0: 
 		heel_strike.append(i-1)
@@ -103,14 +108,14 @@ for i in range(1, len(Fz_filt)-1):
 
 
 fig, ax1 = plt.subplots()
-ax1.plot(time,R_ankle_l,'b', label='Left ankle')
-ax1.plot(time,R_ankle_r,'r', label='Right ankle')
+ax1.plot(time,(Rxz_ankle_l + R_ankle_l)/2,'b', label='Left ankle')
+ax1.plot(time,(Rxz_ankle_r + R_ankle_r)/2,'r', label='Right ankle')
 
-ax1.vlines(x=time[heel_strike], ymin=-100, ymax=100, colors='g', label='Heel strike')
-ax1.vlines(x=time[toe_off], ymin=-100, ymax=100, colors='y', label='Toe off')
+ax1.vlines(x=time[heel_strike], ymin=0, ymax=max(max((Rxz_ankle_l + R_ankle_l)/2), max((Rxz_ankle_r + R_ankle_r)/2)), colors='g', label='Heel strike')
+ax1.vlines(x=time[toe_off], ymin=0, ymax=max(max((Rxz_ankle_l + R_ankle_l)/2), max((Rxz_ankle_r + R_ankle_r)/2)), colors='y', label='Toe off')
 
 ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('x acceleration (mm/s^2)')
+ax1.set_ylabel('Resultant acceleration (mm/s^2)')
 
 ax2 = ax1.twinx()
 ax2.plot(time,Fz_filt,'k', label='Fz')
@@ -121,7 +126,7 @@ fig.tight_layout()
 plt.legend()
 plt.show()
 
-
+'''
 # Left = every odd
 heel_strike_l = heel_strike[0::2]
 toe_off_l = toe_off[0::2]
@@ -144,6 +149,9 @@ plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (mm/s^2)')
 plt.legend()
 plt.show()
+'''
+'''
+Initial working - only good for Run30.csv
 
 # Left
 # Find all maximas and minimas of x acceleration
@@ -343,3 +351,5 @@ plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (mm/s^2)')
 plt.legend()
 plt.show()
+
+'''
