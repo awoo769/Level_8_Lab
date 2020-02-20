@@ -137,88 +137,105 @@ fig.tight_layout()
 '''
 # Find all maximas and minimas of y acceleration
 
-# Minima
+# All minimas
 minimas_ind = np.where(np.r_[True, ay_filt_l[1:] < ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] < ay_filt_l[1:], True] == True)[0]
 
+#All maximas
 maximas_ind = np.where(np.r_[True, ay_filt_l[1:] > ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] > ay_filt_l[1:], True] == True)[0]
-maximas_acc = ay_filt_l[maximas_ind].tolist()
 
+# We only care about the maxima's after the HS event, so sort through and pull out the significant ones
 sig_maxs_ind = []
-previous_step = 0
-maximas_ind_copy = np.array(maximas_ind)
-for step in range(2000,len(ay_filt_l), 2000):
 
-	ind_low = maximas_ind_copy[np.where(maximas_ind_copy > previous_step)[0][0]]
-	ind_high = maximas_ind_copy[np.where(maximas_ind_copy < step)[0][-1]]
+# Initial sort by value of the maxima. Due to drift, find a maximum to compare to every 2 s (2000 data points)
+previous_step = 0
+maximas_ind = np.array(maximas_ind)
+for step in range(2000,len(ay_filt_l), 2000):
+	# Start of the section
+	ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
+	# End of the section
+	ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
+	# Maximum in the 2 s section
 	max_maxima = max(ay_filt_l[ind_low:ind_high+1])
 
-	temp = maximas_ind_copy[np.where(maximas_ind_copy == ind_low)[0][0]:np.where(maximas_ind_copy == ind_high)[0][0] + 1].tolist()
+	# List holding the indicies of the maximums within the 2 s section
+	temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
 
+	# Location of the maximum within the section
 	max_location = np.where(ay_filt_l == max_maxima)[0][0]
+	# Remove the max from the temp list and append it to the significant maxima's list
 	temp.remove(max_location)
 	sig_maxs_ind.append(max_location)
 
+	# Sort through each maxima and accept only those which are high enough
 	for i in range(len(temp)):
 		maxima_value = ay_filt_l[temp[i]]
 		delta = max_maxima / maxima_value
-		# All accepted maximas should not be less than 1/3 of the highest within the 2 second range
-		if delta <= (1/(2/3)) and maxima_value > 0:
+		# All accepted maximas should not be less than 1/3 of the highest within the 2 second section
+		if delta <= (1/(1 - 1/3)) and maxima_value > 0:
 			sig_maxs_ind.append(temp[i])
 
-	#plt.plot(time[ind_low:ind_high+1], ay_filt_l[ind_low:ind_high+1])
-	#plt.show()
-
+	# Loop again, with the previous step being changed to the current step from this iteration
 	previous_step = step
 
-#Check that all values are being encompased (including the end)
+# Check that all values are being encompased (including the end)
 if previous_step < len(ay_filt_l):
 	step = len(ay_filt_l)
-
-	ind_low = maximas_ind_copy[np.where(maximas_ind_copy > previous_step)[0][0]]
-	ind_high = maximas_ind_copy[np.where(maximas_ind_copy < step)[0][-1]]
+	# Start of the final section
+	ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
+	# End of the final section
+	ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
+	# Maximum in the final section
 	max_maxima = max(ay_filt_l[ind_low:ind_high+1])
 
-	temp = maximas_ind_copy[np.where(maximas_ind_copy == ind_low)[0][0]:np.where(maximas_ind_copy == ind_high)[0][0] + 1].tolist()
+	# List holding the indicies of the maximums within the final section
+	temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
 
+	# Location of the maximum within the section
 	max_location = np.where(ay_filt_l == max_maxima)[0][0]
+	# Remove the max from the temp list and append it to the significant maxima's list
 	temp.remove(max_location)
 	sig_maxs_ind.append(max_location)
 
+	# Sort through each maxima and accept only those which are high enough
 	for i in range(len(temp)):
 		maxima_value = ay_filt_l[temp[i]]
 		delta = max_maxima / maxima_value
-		# All accepted maximas should not be less than 1/3 of the highest within the 2 second range
+		# All accepted maximas should not be less than 1/3 of the highest within the final section
 		if delta <= (1/(2/3)) and maxima_value > 0:
 			sig_maxs_ind.append(temp[i])
 
+# First sort is complete. Now we will sort through the remainder based on spacing apart, gradiant, and peak-to-trough distance
 
+# Copy the signiciant maxima indices and wipe the list
 temp_sig = sig_maxs_ind.copy()
 sig_maxs_ind = []
 
-no_add = [] # A list of maximas that will be excluded
+# A list of maximas that will be excluded
+no_add = []
 
-# There should at least be a 0.1 s (100 indices) gap between HS
+# There should at least be a 0.55 s (100 indices) gap between HS. If this isn't the case, the code won't automatically rule 
+# the maxima out
 
+# Make sure that the list is sorted (smallest to largest)
 temp_sig.sort()
 for i in range(0, len(temp_sig)):
-
-	if i == 8:
-		stop = True
-
+	# Get the current maxima indice
 	maxima = temp_sig[i]
 
+	# Don't add the maxima to the list
 	if maxima in no_add:
 		pass
 
 	else:
-		# If this is the last in the list, and the previous maxima was accepted
+		# If this is the last in the list, and the previous maxima was accepted, accept the maxima
 		if (i == len(temp_sig) - 1) and (temp_sig[i-1] in sig_maxs_ind):
 			sig_maxs_ind.append(maxima)
 			break
 
 		# If this is the last in the list, but the previous maxima was not accepted
 		elif (i == len(temp_sig) - 1) and (temp_sig[i-1] not in sig_maxs_ind):
-			# Sometimes there are maxima which we don't want, but they are high enough to be counted. Check the gradient near the top
+			# Sometimes there are maxima which we don't want, but they are high enough to be counted. 
+			# Check the gradient near the top
 			for maxima in temp_sig:
 				# go back 0.01 s (10 indices) and take a linear gradient reading between the two
 				t1, t2 = time[maxima - 10], time[maxima]
@@ -239,7 +256,8 @@ for i in range(0, len(temp_sig)):
 			
 			# If there are two maxima's in close proximity to each other
 			else:
-				# Sometimes there are maxima which we don't want, but they are high enough to be counted. Check the gradient near the top
+				# Sometimes there are maxima which we don't want, but they are high enough to be counted. 
+				# Check the gradient near the top
 				
 				# go back 0.01 s (10 indices) and take a linear gradient reading between the two
 				t1, t2 = time[maxima - 10], time[maxima]
@@ -249,7 +267,7 @@ for i in range(0, len(temp_sig)):
 
 				if m > 500:
 					# Every so often maxima's which we don't want will pass this test. 
-					# Check the distance between max and min of temp_sig[i+1] and temp_sig[i]. The greatest (should) be the HS
+					# Check the distance between max and min of temp_sig[i+1] and temp_sig[i]. The greatest (should) be the HS.
 					# Compare to the minima to the left of the maxima
 					max_1 = maxima # temp_sig[i]
 					max_2 = temp_sig[i+1] # Next maxima
@@ -260,75 +278,65 @@ for i in range(0, len(temp_sig)):
 					dis_1 = ay_filt_l[max_1] - ay_filt_l[min_1]
 					dis_2 = ay_filt_l[max_2] - ay_filt_l[min_2]
 
+					# If the first distance is greater than the second, the 1st maxima is the one we want
 					if dis_1 >= dis_2:					
 						sig_maxs_ind.append(maxima)
-
+						# Exclude the second maxima
 						no_add.append(temp_sig[i+1])
 
-			
+# Sometimes a maxima that we don't want will slip through the code, but it will be caught in the no_add list
+for maxima in sig_maxs_ind:
+	if maxima in no_add:
+		# Remove it. I don't know how it slipped through, but alas, this is the world we live in.
+		sig_maxs_ind.remove(maxima)
+
 # The HS will be at the minima just before a maxima.
 HS = []
 
-# Final check for maxima's
 for maxima in sig_maxs_ind:
-	if maxima in no_add:
-		sig_maxs_ind.remove(maxima)
-
-for maxima in sig_maxs_ind:
-	# Check that the minima is true, and not just a small "blimp"
+	# Check that the minima to the left of the maxima is true, and not just a small "blimp"
 	temp_min = minimas_ind[minimas_ind < maxima][-1]
-	check_ind1 = temp_min - 35
-	check_ind2 = temp_min - 20
+	check_ind1 = temp_min - 35 # Main check
+	check_ind2 = temp_min - 20 # Fine detail
 
+	# Make sure that the check indices are not negative
 	if check_ind1 < 0:
 		check_ind1 = 0
 
 		if check_ind2 < 0:
 			check_ind2 = 0
 
-	min_flag = 0
+	# Flag for when HS has been found
+	HS_flag = 0
 
+	# Initialise counter
 	i = 0
+	# Find the minima just before the maxima (HS)
+	while HS_flag == 0:
 
-	while min_flag == 0:
 		if (ay_filt_l[check_ind1] > ay_filt_l[temp_min]) and not (ay_filt_l[check_ind2] < ay_filt_l[temp_min]):
 			HS.append(temp_min)
 
-			min_flag = 1
+			# HS has been found
+			HS_flag = 1
 		
-		else: 
-			temp_min = minimas_ind[minimas_ind < maxima][i - 2]
+		# It was a "blimp". Move to the next minima to the left and readjust checks
+		else:
+			temp_min = minimas_ind[minimas_ind < maxima][i-2]
 			check_ind1 = temp_min - 35
-			check_ind2 = temp_min - 10
+			check_ind2 = temp_min - 20
 
-			min_flag = 0
-		i += 1
-		if (i > 10):
-			stop = True
+			# HS has not been found
+			HS_flag = 0
+
+			# Increase counter
+			i += 1
 
 plt.plot(time, ay_filt_l)
 plt.plot(time[HS], ay_filt_l[HS], 'or')
 plt.show()
 
-'''
-for i in range(len(sig_maxs_ind)):
-	ind_temp = sig_maxs_ind[i]
 
-	# Get all maxs after the current indice
-	maximas_greater = maximas_ind[maximas_ind > ind_temp].tolist()
-
-	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
-	maximas_greater.sort()
-
-	flag = 0
-	j = 0
-	while flag == 0:
-		if ax_filt_l[maximas_greater[j]] > 0:
-			ind_TO.append(maximas_greater[j])
-			flag = 1
-		else:
-			j += 1
-'''
 """
 '''
 # Find out whether the first step is with the left or right foot.
@@ -401,207 +409,4 @@ plt.legend()
 plt.show()
 '''
 
-'''
-Initial working - only good for Run30.csv
-
-# Left
-# Find all maximas and minimas of x acceleration
-maximas_ind = np.where(np.r_[True, ax_filt_l[1:] > ax_filt_l[:-1]] & np.r_[ax_filt_l[:-1] > ax_filt_l[1:], True] == True)[0]
-maximas_acc = ax_filt_l[maximas_ind].tolist()
-
-maximas_acc.sort(reverse=True)
-temp = maximas_acc.copy()
-
-max_maxima = max(maximas_acc)
-
-# All accepted maximas should not be less than 1/2 of the highest
-sig_maxs = []
-sig_maxs.append(max_maxima)
-temp.remove(max_maxima)
-
-for i in range(len(temp)):
-	delta = max_maxima / temp[i]
-	if delta <= 2 and temp[i] > 0:
-		sig_maxs.append(temp[i])
-
-# Get indices
-sig_maxs_ind = []
-for i in range(len(sig_maxs)):
-	sig_maxs_ind.append(np.where(ax_filt_l == sig_maxs[i])[0][0])
-
-minimas_ind = np.where(np.r_[True, ax_filt_l[1:] < ax_filt_l[:-1]] & np.r_[ax_filt_l[:-1] < ax_filt_l[1:], True] == True)[0]
-minimas_acc = ax_filt_l[minimas_ind].tolist()
-
-minimas_acc.sort()
-temp = minimas_acc.copy()
-
-min_minima = min(minimas_acc)
-
-# All accepted maximas should not be less than 1/2 of the highest
-sig_mins = []
-sig_mins.append(min_minima)
-temp.remove(min_minima)
-
-for i in range(len(temp)):
-	delta = min_minima / temp[i]
-	if delta <= 2 and temp[i] < 0:
-		sig_mins.append(temp[i])
-
-# Get indices
-sig_mins_ind = []
-for i in range(len(sig_mins)):
-	sig_mins_ind.append(np.where(ax_filt_l == sig_mins[i])[0][0])
-
-# For each minima, find the minima previous to it. This will be heel strike
-ind_HS = []
-
-for i in range(len(sig_mins_ind)):
-	ind_temp = sig_mins_ind[i]
-
-	# Get all mins previous to the current indice
-	minimas_less = minimas_ind[minimas_ind < ind_temp].tolist()
-
-	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
-	minimas_less.sort(reverse=True)
-
-	flag = 0
-	j = 0
-	while flag == 0:
-		if ax_filt_l[minimas_less[j]] < 0:
-			ind_HS.append(minimas_less[j])
-			flag = 1
-		else:
-			j += 1
-
-# For each maxima, find the maxima after it. This will be toe off
-ind_TO = []
-
-for i in range(len(sig_maxs_ind)):
-	ind_temp = sig_maxs_ind[i]
-
-	# Get all maxs after the current indice
-	maximas_greater = maximas_ind[maximas_ind > ind_temp].tolist()
-
-	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
-	maximas_greater.sort()
-
-	flag = 0
-	j = 0
-	while flag == 0:
-		if ax_filt_l[maximas_greater[j]] > 0:
-			ind_TO.append(maximas_greater[j])
-			flag = 1
-		else:
-			j += 1
-	
-plt.plot(time, ax_filt_l,'k')
-plt.plot(time[ind_HS], ax_filt_l[ind_HS], 'ob', label='heel strike')
-plt.plot(time[ind_TO], ax_filt_l[ind_TO], 'og', label='toe off')
-
-plt.xlabel('Time (s)')
-plt.ylabel('Acceleration (mm/s^2)')
-plt.legend()
-plt.show()
-
-
-# Right
-# Find all maximas and minimas of x acceleration
-maximas_ind = np.where(np.r_[True, ax_filt_r[1:] > ax_filt_r[:-1]] & np.r_[ax_filt_r[:-1] > ax_filt_r[1:], True] == True)[0]
-maximas_acc = ax_filt_r[maximas_ind].tolist()
-
-maximas_acc.sort(reverse=True)
-temp = maximas_acc.copy()
-
-max_maxima = max(maximas_acc)
-
-# All accepted maximas should not be less than 1/2 of the highest
-sig_maxs = []
-sig_maxs.append(max_maxima)
-temp.remove(max_maxima)
-
-for i in range(len(temp)):
-	delta = max_maxima / temp[i]
-	if delta <= 2 and temp[i] > 0:
-		sig_maxs.append(temp[i])
-
-# Get indices
-sig_maxs_ind = []
-for i in range(len(sig_maxs)):
-	sig_maxs_ind.append(np.where(ax_filt_r == sig_maxs[i])[0][0])
-
-minimas_ind = np.where(np.r_[True, ax_filt_r[1:] < ax_filt_r[:-1]] & np.r_[ax_filt_r[:-1] < ax_filt_r[1:], True] == True)[0]
-minimas_acc = ax_filt_r[minimas_ind].tolist()
-
-minimas_acc.sort()
-temp = minimas_acc.copy()
-
-min_minima = min(minimas_acc)
-
-# All accepted maximas should not be less than 1/2 of the highest
-sig_mins = []
-sig_mins.append(min_minima)
-temp.remove(min_minima)
-
-for i in range(len(temp)):
-	delta = min_minima / temp[i]
-	if delta <= 2 and temp[i] < 0:
-		sig_mins.append(temp[i])
-
-# Get indices
-sig_mins_ind = []
-for i in range(len(sig_mins)):
-	sig_mins_ind.append(np.where(ax_filt_r == sig_mins[i])[0][0])
-
-# For each minima, find the minima previous to it. This will be heel strike
-ind_HS = []
-
-for i in range(len(sig_mins_ind)):
-	ind_temp = sig_mins_ind[i]
-
-	# Get all mins previous to the current indice
-	minimas_less = minimas_ind[minimas_ind < ind_temp].tolist()
-
-	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
-	minimas_less.sort(reverse=True)
-
-	flag = 0
-	j = 0
-	while flag == 0:
-		if ax_filt_r[minimas_less[j]] < 0:
-			ind_HS.append(minimas_less[j])
-			flag = 1
-		else:
-			j += 1
-
-# For each maxima, find the maxima after it. This will be toe off
-ind_TO = []
-
-for i in range(len(sig_maxs_ind)):
-	ind_temp = sig_maxs_ind[i]
-
-	# Get all maxs after the current indice
-	maximas_greater = maximas_ind[maximas_ind > ind_temp].tolist()
-
-	# Sort, the indice at the beginning will be the one we want (unless it is greater than 0)
-	maximas_greater.sort()
-
-	flag = 0
-	j = 0
-	while flag == 0:
-		if ax_filt_r[maximas_greater[j]] > 0:
-			ind_TO.append(maximas_greater[j])
-			flag = 1
-		else:
-			j += 1
-	
-plt.plot(time, ax_filt_r,'k')
-plt.plot(time[ind_HS], ax_filt_r[ind_HS], 'ob', label='heel strike')
-plt.plot(time[ind_TO], ax_filt_r[ind_TO], 'og', label='toe off')
-
-plt.xlabel('Time (s)')
-plt.ylabel('Acceleration (mm/s^2)')
-plt.legend()
-plt.show()
-
-'''
 """
