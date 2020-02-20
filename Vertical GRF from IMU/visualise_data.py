@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 # Read in file
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0049run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0102run1.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -121,10 +121,10 @@ for i in range(1, len(Fz_filt)-1):
 		toe_off.append(i+1)
 
 fig, ax1 = plt.subplots()
-ax1.plot(time, ax_filt_l,'b', label='Left ankle')
-ax1.plot(time[toe_off], ax_filt_l[toe_off], 'or', label='toe off')
+ax1.plot(time, R_ankle_l,'b', label='Left ankle')
+ax1.plot(time[toe_off], R_ankle_l[toe_off], 'or', label='toe off')
 ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('x acceleration (mm/s^2)')
+ax1.set_ylabel('Resultant acceleration (mm/s^2)')
 ax1.legend()
 
 #ax2 = ax1.twinx()
@@ -145,7 +145,7 @@ maximas_ind = np.where(np.r_[True, ay_filt_l[1:] > ay_filt_l[:-1]] & np.r_[ay_fi
 # We only care about the maxima's after the HS event, so sort through and pull out the significant ones
 sig_maxs_ind = []
 
-# Initial sort by value of the maxima. Due to drift, find a maximum to compare to every 2 s (2000 data points)
+# Initial sort by value of the maxima. Due to drift/irregularity, find a maximum to compare to every 2 s (2000 data points)
 previous_step = 0
 maximas_ind = np.array(maximas_ind)
 for step in range(2000,len(ay_filt_l), 2000):
