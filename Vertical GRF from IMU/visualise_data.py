@@ -332,81 +332,13 @@ for maxima in sig_maxs_ind:
 			# Increase counter
 			i += 1
 
-plt.plot(time, ay_filt_l)
-plt.plot(time[HS], ay_filt_l[HS], 'or')
-plt.show()
+plt.plot(time, ay_filt_l, label='y acceleration')
+plt.plot(time[HS], ay_filt_l[HS], 'or', label='heel-strike')
 
-
-"""
-'''
-# Find out whether the first step is with the left or right foot.
-plt.plot(time,ax_filt_l,'b', label='Left ankle')
-plt.plot(time,-ax_filt_r,'r', label='Right ankle')
+plt.xlabel('time (s)')
+plt.ylabel('y acceleration (mm/s^2)')
 plt.legend()
-plt.xlabel('Time (s)')
-plt.ylabel('x acceleration (mm/s^2)')
-plt.show()
-'''
 
-# Assuming z is vertical direction
-heel_strike = []
-toe_off = []
-
-# First step is left. - we don't know this yet
-
-# Get the points where there is force applied to the force plate (stance phase). Beginning = HS, end = TO
-for i in range(1, len(Fz_filt)-1):
-	if Fz_filt[i-1] == 0 and Fz_filt[i] != 0:
-		heel_strike.append(i-1)
-	
-	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
-		toe_off.append(i+1)
-
-# Find out whether the first step is with the left or right foot.
-
-fig, ax1 = plt.subplots()
-ax1.plot(time,(Rxz_ankle_l + R_ankle_l)/2,'b', label='Left ankle')
-ax1.plot(time,(Rxz_ankle_r + R_ankle_r)/2,'r', label='Right ankle')
-
-ymax = max(max((Rxz_ankle_l + R_ankle_l)/2), max((Rxz_ankle_r + R_ankle_r)/2))
-ax1.vlines(x=time[heel_strike], ymin=0, ymax=ymax, colors='g', label='Heel strike')
-ax1.vlines(x=time[toe_off], ymin=0, ymax=ymax, colors='y', label='Toe off')
-
-ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('Resultant acceleration (mm/s^2)')
-
-ax2 = ax1.twinx()
-ax2.plot(time,Fz_filt,'k', label='Fz')
-ax2.set_ylabel('Vertical force (N)')
-
-fig.tight_layout()
-
-plt.legend()
 plt.show()
 
-'''
-# Left = every odd
-heel_strike_l = heel_strike[0::2]
-toe_off_l = toe_off[0::2]
 
-# Right = every even
-heel_strike_r = heel_strike[1::2]
-toe_off_r = toe_off[1::2]
-
-plt.plot(time, ax_filt_r,'r', label='x')
-#plt.plot(time, ay_filt_r,'g', label='y')
-#plt.plot(time, az_filt_r,'b', label='z')
-#lt.plot(time, R_ankle_l,'k', label='resultant')
-#plt.plot(time, az_filt_l,'k', label='z')
-#plt.plot(time,Fz_filt,'b',label='Fz_filt')
-
-#plt.plot(time,Fz_filt,'r')
-plt.plot(time[heel_strike_r], ax_filt_r[heel_strike_r],'ob', label='heel strike')
-plt.plot(time[toe_off_r], ax_filt_r[toe_off_r],'og', label='toe off')
-plt.xlabel('Time (s)')
-plt.ylabel('Acceleration (mm/s^2)')
-plt.legend()
-plt.show()
-'''
-
-"""
