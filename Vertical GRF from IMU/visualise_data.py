@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 # Read in file
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0128run1.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0049run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -119,14 +119,12 @@ for i in range(1, len(Fz_filt)-1):
 	
 	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 		toe_off.append(i+1)
-'''
-fig, ax1 = plt.subplots()
-ax1.plot(time, ay_filt_l,'b', label='Left ankle')
 
-#ax1.plot(time[heel_strike], ay_filt_l[heel_strike], 'og', label='heel strike')
-#ax1.plot(time[toe_off], ay_filt_l[toe_off], 'or', label='toe off')
+fig, ax1 = plt.subplots()
+ax1.plot(time, ax_filt_l,'b', label='Left ankle')
+ax1.plot(time[toe_off], ax_filt_l[toe_off], 'or', label='toe off')
 ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('y acceleration (mm/s^2)')
+ax1.set_ylabel('x acceleration (mm/s^2)')
 ax1.legend()
 
 #ax2 = ax1.twinx()
@@ -134,13 +132,14 @@ ax1.legend()
 #ax2.set_ylabel('Vertical force (N)')
 
 fig.tight_layout()
-'''
+plt.show()
+
 # Find all maximas and minimas of y acceleration
 
 # All minimas
 minimas_ind = np.where(np.r_[True, ay_filt_l[1:] < ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] < ay_filt_l[1:], True] == True)[0]
 
-#All maximas
+# All maximas
 maximas_ind = np.where(np.r_[True, ay_filt_l[1:] > ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] > ay_filt_l[1:], True] == True)[0]
 
 # We only care about the maxima's after the HS event, so sort through and pull out the significant ones
@@ -340,5 +339,3 @@ plt.ylabel('y acceleration (mm/s^2)')
 plt.legend()
 
 plt.show()
-
-
