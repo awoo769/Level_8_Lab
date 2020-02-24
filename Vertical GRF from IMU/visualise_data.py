@@ -12,7 +12,7 @@ Auckland Bioengineering Institution
 
 '''
 
-# Read in file
+''' Read in file '''
 data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0102run1.csv'
 
 with open(data_directory, 'r') as csvfile:
@@ -48,7 +48,7 @@ grf_x = (np.array(read_file)[:,1]).astype(np.float) # 2nd column
 grf_y = (np.array(read_file)[:,2]).astype(np.float) # 3rd column
 grf_z = (np.array(read_file)[:,3]).astype(np.float) # 4th column
 
-# Filter data at 25 Hz
+''' Filter data at 25 Hz '''
 analog_frequency = 1000
 cut_off = 25 # Weyand (2017)
 order = 4 # Weyand (2017)
@@ -59,16 +59,12 @@ ay_filt_l = signal.filtfilt(b, a, a_y_ankle_l)
 az_filt_l = signal.filtfilt(b, a, a_z_ankle_l)
 R_ankle_l = np.sqrt(np.power(ax_filt_l, 2) + np.power(ay_filt_l, 2) + np.power(az_filt_l, 2))
 
-Rxz_ankle_l = np.sqrt(np.power(ax_filt_l, 2) + np.power(az_filt_l, 2))
-
 ax_filt_r = signal.filtfilt(b, a, a_x_ankle_r)
 ay_filt_r = signal.filtfilt(b, a, a_y_ankle_r)
 az_filt_r = signal.filtfilt(b, a, a_z_ankle_r)
 R_ankle_r = np.sqrt(np.power(ax_filt_r, 2) + np.power(ay_filt_r, 2) + np.power(az_filt_r, 2))
 
-Rxz_ankle_r = np.sqrt(np.power(ax_filt_r, 2) + np.power(az_filt_r, 2))
-
-''' Figure out which direction IMU is facing and put in the correct direction if not what is expected'''
+''' Figure out which direction IMU is facing and put in the correct direction if not what is expected '''
 # IMU should be on the medial aspect of the tibia. 
 # Left coordinate system: y = up, z = towards midline, x = forward direction
 # Right coordinate system: y = down, z = towards midline, x = forward direction
@@ -92,7 +88,6 @@ else:
 Fx_filt = signal.filtfilt(b, a, grf_x)
 Fy_filt = signal.filtfilt(b, a, grf_y)
 Fz_filt = signal.filtfilt(b, a, grf_z)
-R_F = np.sqrt(np.power(Fx_filt, 2) + np.power(Fy_filt, 2) + np.power(Fz_filt, 2))
 
 # Flip vertical forces as z (vertical axis in force plate coordinate system) is negative - this is just to get contact points.
 # Will not be used in final version.
@@ -102,17 +97,16 @@ grf_z = -grf_z
 # Find when the vertical forces drop below threshold, and then make all of the forces 0.0 at these points.
 force_threshold = 20
 
-# Find the indices where the vertical force is below our threshold
+# Find the indices where the vertical force is below the threshold
 force_zero = np.where(Fz_filt < force_threshold)
 
 # Set these values to 0
 Fz_filt[force_zero] = 0.0
-R_F[force_zero] = 0.0
 
-
+# Get the points where there is force applied to the force plate (stance phase). Beginning = heel strike, end = toe off
 heel_strike = []
 toe_off = []
-# Get the points where there is force applied to the force plate (stance phase). Beginning = HS, end = TO
+
 for i in range(1, len(Fz_filt)-1):
 	if Fz_filt[i-1] == 0 and Fz_filt[i] != 0:
 		heel_strike.append(i-1)
@@ -120,21 +114,37 @@ for i in range(1, len(Fz_filt)-1):
 	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 		toe_off.append(i+1)
 
-fig, ax1 = plt.subplots()
-ax1.plot(time, R_ankle_l,'b', label='Left ankle')
-ax1.plot(time[toe_off], R_ankle_l[toe_off], 'or', label='toe off')
-ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('Resultant acceleration (mm/s^2)')
-ax1.legend()
+# Plot 2 seconds of data (2000 points) for observation
+fig, axs = plt.subplots(2)
 
-#ax2 = ax1.twinx()
-#ax2.plot(time,Fz_filt,'k', label='Fz')
-#ax2.set_ylabel('Vertical force (N)')
+# Acceleration data
+axs[1].plot(time[:4000], ax_filt_l[:4000],'r', label='x ankle')
+axs[1].plot(time[:4000], ay_filt_l[:4000],'g', label='y ankle')
+axs[1].plot(time[:4000], az_filt_l[:4000],'b', label='z ankle')
+axs[1].plot((time[toe_off])[:11], (ax_filt_l[toe_off])[:11], 'or', label='toe off')
+axs[1].set_xlabel('Time (s)')
+axs[1].set_ylabel('Acceleration (mm/s^2)')
+axs[1].legend()
 
-fig.tight_layout()
+# Scale force so viewing is easier (arbitrary y axis)
+max_R = max(R_ankle_l)
+max_F = max(Fz_filt)
+
+scale_factor = max_F / max_R
+
+Fz_filt = Fz_filt / scale_factor
+
+# Vertical GRF & resultant acceleration
+axs[0].plot(time[:4000], Fz_filt[:4000],'k', label='Vertical GRF')
+axs[0].plot(time[:4000], R_ankle_l[:4000],'m', label='R ankle')
+axs[0].set_ylabel('Force/Acceleration (arbitrary)')
+axs[0].set_xlabel('Time (s)')
+axs[0].legend()
+
 plt.show()
 
-# Find all maximas and minimas of y acceleration
+''' Find the HS and TO events of the left foot '''
+# Find all maximas and minimas of acceleration in the y direction
 
 # All minimas
 minimas_ind = np.where(np.r_[True, ay_filt_l[1:] < ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] < ay_filt_l[1:], True] == True)[0]
@@ -142,10 +152,10 @@ minimas_ind = np.where(np.r_[True, ay_filt_l[1:] < ay_filt_l[:-1]] & np.r_[ay_fi
 # All maximas
 maximas_ind = np.where(np.r_[True, ay_filt_l[1:] > ay_filt_l[:-1]] & np.r_[ay_filt_l[:-1] > ay_filt_l[1:], True] == True)[0]
 
-# We only care about the maxima's after the HS event, so sort through and pull out the significant ones
+# We only care about the maxima's directly after the HS event, so sort through and pull out the significant ones
 sig_maxs_ind = []
 
-# Initial sort by value of the maxima. Due to drift/irregularity, find a maximum to compare to every 2 s (2000 data points)
+# Initially sift by value of the maxima. Due to drift/irregularity, find a maximum to compare to every 2 s (2000 data points)
 previous_step = 0
 maximas_ind = np.array(maximas_ind)
 for step in range(2000,len(ay_filt_l), 2000):
