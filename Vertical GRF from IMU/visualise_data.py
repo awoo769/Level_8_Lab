@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0102run1.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0102run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -113,7 +113,7 @@ for i in range(1, len(Fz_filt)-1):
 	
 	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 		toe_off.append(i+1)
-
+'''
 # Plot 2 seconds of data (2000 points) for observation
 fig, axs = plt.subplots(2)
 
@@ -142,8 +142,10 @@ axs[0].set_xlabel('Time (s)')
 axs[0].legend()
 
 plt.show()
-
+'''
 ''' Find the HS and TO events of the left foot '''
+
+''' Finding Heel Strike '''
 # Find all maximas and minimas of acceleration in the y direction
 
 # All minimas
@@ -190,30 +192,34 @@ for step in range(2000,len(ay_filt_l), 2000):
 if previous_step < len(ay_filt_l):
 	step = len(ay_filt_l)
 	# Start of the final section
-	ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
-	# End of the final section
-	ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
-	# Maximum in the final section
-	max_maxima = max(ay_filt_l[ind_low:ind_high+1])
+	try:
+		ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
+		# End of the final section
+		ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
+		# Maximum in the final section
+		max_maxima = max(ay_filt_l[ind_low:ind_high+1])
 
-	# List holding the indicies of the maximums within the final section
-	temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
+		# List holding the indicies of the maximums within the final section
+		temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
 
-	# Location of the maximum within the section
-	max_location = np.where(ay_filt_l == max_maxima)[0][0]
-	# Remove the max from the temp list and append it to the significant maxima's list
-	temp.remove(max_location)
-	sig_maxs_ind.append(max_location)
+		# Location of the maximum within the section
+		max_location = np.where(ay_filt_l == max_maxima)[0][0]
+		# Remove the max from the temp list and append it to the significant maxima's list
+		temp.remove(max_location)
+		sig_maxs_ind.append(max_location)
 
-	# Sort through each maxima and accept only those which are high enough
-	for i in range(len(temp)):
-		maxima_value = ay_filt_l[temp[i]]
-		delta = max_maxima / maxima_value
-		# All accepted maximas should not be less than 1/3 of the highest within the final section
-		if delta <= (1/(2/3)) and maxima_value > 0:
-			sig_maxs_ind.append(temp[i])
+		# Sort through each maxima and accept only those which are high enough
+		for i in range(len(temp)):
+			maxima_value = ay_filt_l[temp[i]]
+			delta = max_maxima / maxima_value
+			# All accepted maximas should not be less than 1/3 of the highest within the final section
+			if delta <= (1/(2/3)) and maxima_value > 0:
+				sig_maxs_ind.append(temp[i])
+	except IndexError:
+		# While we have not gone through all the data, there are no more maxima's in the data
+		pass
 
-# First sort is complete. Now we will sort through the remainder based on spacing apart, gradiant, and peak-to-trough distance
+# First sifting is complete. Now we will sort through the remainder based on spacing, gradiant, and peak-to-trough distance
 
 # Copy the signiciant maxima indices and wipe the list
 temp_sig = sig_maxs_ind.copy()
@@ -222,8 +228,8 @@ sig_maxs_ind = []
 # A list of maximas that will be excluded
 no_add = []
 
-# There should at least be a 0.55 s (100 indices) gap between HS. If this isn't the case, the code won't automatically rule 
-# the maxima out
+# There should at least be a 0.55 s (100 indices) gap between HS. (If this isn't the case, the code won't automatically rule 
+# the maxima out)
 
 # Make sure that the list is sorted (smallest to largest)
 temp_sig.sort()
@@ -341,11 +347,148 @@ for maxima in sig_maxs_ind:
 			# Increase counter
 			i += 1
 
-plt.plot(time, ay_filt_l, label='y acceleration')
-plt.plot(time[HS], ay_filt_l[HS], 'or', label='heel-strike')
+''' Finding Toe off '''
+# Find all maximas acceleration in the z direction
 
-plt.xlabel('time (s)')
-plt.ylabel('y acceleration (mm/s^2)')
-plt.legend()
+# All maximas
+maximas_ind = np.where(np.r_[True, az_filt_l[1:] > az_filt_l[:-1]] & np.r_[az_filt_l[:-1] > az_filt_l[1:], True] == True)[0]
 
+# We only care about the maxima's directly after the HS event, so sort through and pull out the significant ones
+sig_maxs_ind = []
+
+# Initially sift by value of the maxima. Due to drift/irregularity, find a maximum to compare to every 2 s (2000 data points)
+previous_step = 0
+maximas_ind = np.array(maximas_ind)
+for step in range(2000,len(az_filt_l), 2000):
+	# Start of the section
+	ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
+	# End of the section
+	ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
+	# Maximum in the 2 s section
+	max_maxima = max(az_filt_l[ind_low:ind_high+1])
+
+	# List holding the indicies of the maximums within the 2 s section
+	temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
+
+	# Location of the maximum within the section
+	max_location = np.where(az_filt_l == max_maxima)[0][0]
+	# Remove the max from the temp list and append it to the significant maxima's list
+	temp.remove(max_location)
+	sig_maxs_ind.append(max_location)
+
+	# Sort through each maxima and accept only those which are high enough
+	for i in range(len(temp)):
+		maxima_value = az_filt_l[temp[i]]
+		delta = max_maxima / maxima_value
+		# All accepted maximas should not be less than 1/3 of the highest within the 2 second section
+		if delta <= (1/(1 - 1/3)) and maxima_value > 0:
+			sig_maxs_ind.append(temp[i])
+
+	# Loop again, with the previous step being changed to the current step from this iteration
+	previous_step = step
+
+# Check that all values are being encompased (including the end)
+if previous_step < len(az_filt_l):
+	step = len(az_filt_l)
+	# Start of the final section
+	try:
+		ind_low = maximas_ind[np.where(maximas_ind > previous_step)[0][0]]
+		# End of the final section
+		ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
+		# Maximum in the final section
+		max_maxima = max(az_filt_l[ind_low:ind_high+1])
+
+		# List holding the indicies of the maximums within the final section
+		temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
+
+		# Location of the maximum within the section
+		max_location = np.where(az_filt_l == max_maxima)[0][0]
+		# Remove the max from the temp list and append it to the significant maxima's list
+		temp.remove(max_location)
+		sig_maxs_ind.append(max_location)
+
+		# Sort through each maxima and accept only those which are high enough
+		for i in range(len(temp)):
+			maxima_value = az_filt_l[temp[i]]
+			delta = max_maxima / maxima_value
+			# All accepted maximas should not be less than 1/3 of the highest within the final section
+			if delta <= (1/(2/3)) and maxima_value > 0:
+				sig_maxs_ind.append(temp[i])
+	except IndexError:
+		# While we weren't at the end of the trial, there are no more maximums to deal with
+		pass
+
+# First sifting is complete. Now we will sort through the remainder based on spacing, gradiant, and peak-to-trough distance
+
+# Copy the signiciant maxima indices and wipe the list
+temp_sig = sig_maxs_ind.copy()
+sig_maxs_ind = []
+
+# A list of maximas that will be excluded
+no_add = []
+
+# There should at least be a 0.55 s (100 indices) gap between TO. (If this isn't the case, the code won't automatically rule 
+# the maxima out)
+
+# Make sure that the list is sorted (smallest to largest)
+temp_sig.sort()
+for i in range(0, len(temp_sig)):
+	# Get the current maxima indice
+	maxima = temp_sig[i]
+
+	# Don't add the maxima to the list
+	if maxima in no_add:
+		pass
+
+	else:
+		# If this is the last in the list, check the distance between maximas
+		if (i == len(temp_sig) - 1):
+			# Check distance between this maxima and the previous one
+			dist = az_filt_l[maxima] - az_filt_l[temp_sig[i-1]]
+
+			# If the distance is greater than 550, accept the maxima
+			if dist >= 400:					
+				sig_maxs_ind.append(maxima)
+
+		# If we are at any point other than the last in the list
+		elif i < len(temp_sig) - 1:
+
+			# See if the distance between the current maxima and the next is greater than 0.4 s.
+			# If it is, accept the maxima
+			if temp_sig[i+1] - maxima > 400:
+				sig_maxs_ind.append(maxima)
+			
+			# If there are two maxima's in close proximity to each other
+			else:
+				# Sometimes there are maxima which we don't want, but they are high enough to be counted.
+				# If the previous value is counted, don't include this value. If not, include it.
+
+				if maxima - sig_maxs_ind[-1] > 400:
+					# If the gradient is very sharp (> 200), do not include.
+					# go back 0.01 s (10 indices) and take a linear gradient reading between the two
+					t1, t2 = time[maxima - 10], time[maxima]
+					a1, a2 = az_filt_l[maxima - 10], az_filt_l[maxima]
+
+					m = (a2 - a1) / (t2 - t1)
+
+					if m > 200:
+						no_add.append(maxima)
+					
+					else:
+						sig_maxs_ind.append(maxima)
+						no_add.append(temp_sig[i+1])
+
+				elif temp_sig[i - 1] in sig_maxs_ind:
+					no_add.append(maxima)
+
+					
+
+# Sometimes a maxima that we don't want will slip through the code, but it will be caught in the no_add list
+for maxima in sig_maxs_ind:
+	if maxima in no_add:
+		# Remove it. I don't know how it slipped through, but alas, this is the world we live in.
+		sig_maxs_ind.remove(maxima)
+
+plt.plot(time, az_filt_l)
+plt.plot(time[sig_maxs_ind], az_filt_l[sig_maxs_ind],'o')
 plt.show()
