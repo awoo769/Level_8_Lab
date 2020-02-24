@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0102run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0119run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -365,16 +365,21 @@ for step in range(2000,len(az_filt_l), 2000):
 	# End of the section
 	ind_high = maximas_ind[np.where(maximas_ind < step)[0][-1]]
 	# Maximum in the 2 s section
-	max_maxima = max(az_filt_l[ind_low:ind_high+1])
+	max_maxima_ind = np.where(az_filt_l == max(az_filt_l[ind_low:ind_high+1]))[0][0]
+
+	# Only count this as the maxima if its gradient is less than 300.
+	t1, t2 = time[max_maxima_ind - 10], time[max_maxima_ind]
+	a1, a2 = az_filt_l[max_maxima_ind - 10], az_filt_l[max_maxima_ind]
+	m = (a2 - a1) / (t2 - t1)
+
+	if m < 350:
+		max_maxima = az_filt_l[max_maxima_ind]
+	else:
+		# Keep as the previous largest value
+		max_maxima = max_maxima
 
 	# List holding the indicies of the maximums within the 2 s section
 	temp = maximas_ind[np.where(maximas_ind == ind_low)[0][0]:np.where(maximas_ind == ind_high)[0][0] + 1].tolist()
-
-	# Location of the maximum within the section
-	max_location = np.where(az_filt_l == max_maxima)[0][0]
-	# Remove the max from the temp list and append it to the significant maxima's list
-	temp.remove(max_location)
-	sig_maxs_ind.append(max_location)
 
 	# Sort through each maxima and accept only those which are high enough
 	for i in range(len(temp)):
@@ -443,11 +448,11 @@ for i in range(0, len(temp_sig)):
 	else:
 		# If this is the last in the list, check the distance between maximas
 		if (i == len(temp_sig) - 1):
-			# Check distance between this maxima and the previous one
-			dist = az_filt_l[maxima] - az_filt_l[temp_sig[i-1]]
+			# Check distance between this maxima and the last accepted maxima
+			dist = maxima - sig_maxs_ind[-1]
 
 			# If the distance is greater than 550, accept the maxima
-			if dist >= 400:					
+			if dist >= 400:				
 				sig_maxs_ind.append(maxima)
 
 		# If we are at any point other than the last in the list
@@ -463,15 +468,15 @@ for i in range(0, len(temp_sig)):
 				# Sometimes there are maxima which we don't want, but they are high enough to be counted.
 				# If the previous value is counted, don't include this value. If not, include it.
 
-				if maxima - sig_maxs_ind[-1] > 400:
-					# If the gradient is very sharp (> 200), do not include.
+				if len(sig_maxs_ind) > 1 and (maxima - sig_maxs_ind[-1] > 400):
+					# If the gradient is very sharp (> 350), do not include.
 					# go back 0.01 s (10 indices) and take a linear gradient reading between the two
 					t1, t2 = time[maxima - 10], time[maxima]
 					a1, a2 = az_filt_l[maxima - 10], az_filt_l[maxima]
 
 					m = (a2 - a1) / (t2 - t1)
 
-					if m > 200:
+					if m > 350:
 						no_add.append(maxima)
 					
 					else:
