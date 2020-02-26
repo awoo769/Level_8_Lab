@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0130run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0049run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -40,7 +40,7 @@ a_z_ankle_l = (np.array(read_file)[:,6]).astype(np.float) # 7th column
 
 # Right foot
 a_x_ankle_r = (np.array(read_file)[:,7]).astype(np.float) # 8th column
-a_y_ankle_r = (np.array(read_file)[:,9]).astype(np.float) # 9th column
+a_y_ankle_r = (np.array(read_file)[:,8]).astype(np.float) # 9th column
 a_z_ankle_r = (np.array(read_file)[:,9]).astype(np.float) # 10th column
 
 # Also take force plate data for comparison
@@ -81,24 +81,28 @@ ax_filt_l_low = signal.filtfilt(b2, a2, a_x_ankle_l)
 ay_filt_l_low = signal.filtfilt(b2, a2, a_y_ankle_l)
 az_filt_l_low = signal.filtfilt(b2, a2, a_z_ankle_l)
 
+ax_filt_r_low = signal.filtfilt(b2, a2, a_x_ankle_r)
+ay_filt_r_low = signal.filtfilt(b2, a2, a_y_ankle_r)
+az_filt_r_low = signal.filtfilt(b2, a2, a_z_ankle_r)
+
 ''' Figure out which direction IMU is facing and put in the correct direction if not what is expected '''
 # IMU should be on the medial aspect of the tibia. 
 # Left coordinate system: y = up, z = towards midline, x = forward direction
-# Right coordinate system: y = down, z = towards midline, x = forward direction
+# Right coordinate system: y = up, z = towards midline, x = backward direction
 
-if abs(max(ay_filt_l)) == max(abs(max(ay_filt_l)), abs(min(ay_filt_l))): # y should be positive
+if abs(max(ax_filt_l)) == max(abs(max(ax_filt_l)), abs(min(ax_filt_l))): # x should be positive
 	pass
 else:
-	# Rotate 180 deg around the z axis
-	ay_filt_l = -ay_filt_l
+	# Rotate 180 deg around the y axis
 	ax_filt_l = -ax_filt_l
+	az_filt_l = -az_filt_l
 
-if abs(min(ay_filt_r)) == max(abs(max(ay_filt_r)), abs(min(ay_filt_r))): # y should be negative
+if abs(min(ay_filt_r)) == max(abs(max(ay_filt_r)), abs(min(ay_filt_r))): # x should be negative
 	pass
 else:
-	# Rotate 180 deg around the z axis
-	ay_filt_r = -ay_filt_r
+	# Rotate 180 deg around the y axis
 	ax_filt_r = -ax_filt_r
+	az_filt_r = -az_filt_r
 
 # Because the IMU's are in different orientations for the left and right leg, we will treat these separately
 
@@ -135,17 +139,17 @@ for i in range(1, len(Fz_filt)-1):
 fig, axs = plt.subplots(2)
 
 # Acceleration data
-axs[1].plot(time[:4000], ax_filt_l_low[:4000],'r', label='x ankle')
-axs[1].plot(time[:4000], ay_filt_l_low[:4000],'g', label='y ankle')
-axs[1].plot(time[:4000], az_filt_l_low[:4000],'b', label='z ankle')
-axs[1].plot((time[heel_strike])[:11], (ax_filt_l_low[heel_strike])[:11], 'or', label='toe off')
-axs[1].plot((time[heel_strike])[:11], (az_filt_l_low[heel_strike])[:11], 'or', label='toe off')
+axs[1].plot(time[:4000], ax_filt_r_low[:4000],'r', label='x ankle')
+axs[1].plot(time[:4000], ay_filt_r_low[:4000],'g', label='y ankle')
+axs[1].plot(time[:4000], az_filt_r_low[:4000],'b', label='z ankle')
+axs[1].plot((time[toe_off])[:11], (ay_filt_r_low[toe_off])[:11], 'or', label='toe off')
+#axs[1].plot((time[toe_off])[:11], (az_filt_r_low[toe_off])[:11], 'or', label='toe off')
 axs[1].set_xlabel('Time (s)')
 axs[1].set_ylabel('Acceleration (mm/s^2)')
 axs[1].legend()
 
 # Scale force so viewing is easier (arbitrary y axis)
-max_R = max(R_ankle_l)
+max_R = max(R_ankle_r)
 max_F = max(Fz_filt)
 
 scale_factor = max_F / max_R
@@ -154,7 +158,7 @@ Fz_filt = Fz_filt / scale_factor
 
 # Vertical GRF & resultant acceleration
 axs[0].plot(time[:4000], Fz_filt[:4000],'k', label='Vertical GRF')
-axs[0].plot(time[:4000], R_ankle_l[:4000],'m', label='R ankle')
+axs[0].plot(time[:4000], R_ankle_r[:4000],'m', label='R ankle')
 axs[0].set_ylabel('Force/Acceleration (arbitrary)')
 axs[0].set_xlabel('Time (s)')
 axs[0].legend()
@@ -163,73 +167,104 @@ plt.show()
 
 ''' Find the HS and TO events of the left foot '''
 
-def get_heel_strike_left(time: np.array, az_filt_l_low: np.array):
+def get_heel_strike_event(time: np.array, az: np.array, foot: str):
 	
 	'''
-	This function estimates the heel strike event for the left foot using IMU data. The IMU should be placed on the medial
+	This function estimates the heel strike event for the ankle using IMU data. The IMU should be placed on the medial
 	aspect of the tibia.
 
 	The z acceleration data should be filtered at 2 Hz (low pass butter worth filter, n = 4)
 
 	'''
 
-	# Find all maximas and minimas of acceleration in the y direction
+	if 'l' in foot or 'r' in foot:
+		# All minimas
+		HS = np.where(np.r_[True, az[1:] < az[:-1]] & np.r_[az[:-1] < az[1:], True] == True)[0]
 
-	# All minimas
-	HS = np.where(np.r_[True, az_filt_l_low[1:] < az_filt_l_low[:-1]] & np.r_[az_filt_l_low[:-1] < az_filt_l_low[1:], True] == True)[0]
+	else:
+		print('Please enter appropriate label for foot type')
 
 	return HS.tolist()
 
-def get_toe_off_left(time: np.array, ay_filt_l_low: np.array):
+def get_toe_off_event(time: np.array, ay: np.array, foot: str):
 	
 	'''
-	This function estimates the toe off event for the left foot using IMU data. The IMU should be placed on the medial
+	This function estimates the toe off event for the ankle using IMU data. The IMU should be placed on the medial
 	aspect of the tibia.
+
+	The y acceleration data should be filtered at 2 Hz (low pass butter worth filter, n = 4)
 
 	'''
 
-	# Find all maximas acceleration in the z direction
+	if 'l' in foot or 'r' in foot:
+		# Find all maximas acceleration in the y direction
 
-	# All maximas
-	TO = np.where(np.r_[True, ay_filt_l_low[1:] > ay_filt_l_low[:-1]] & np.r_[ay_filt_l_low[:-1] > ay_filt_l_low[1:], True] == True)[0]
+		# All maximas
+		TO = np.where(np.r_[True, ay[1:] > ay[:-1]] & np.r_[ay[:-1] > ay[1:], True] == True)[0]
+	
+	else:
+		print('Please enter appropriate label for foot type')
+
 	return TO.tolist()
 
-HS = get_heel_strike_left(time, az_filt_l_low)
-TO = get_toe_off_left(time, ay_filt_l_low)
+HS_l = get_heel_strike_event(time, az_filt_l_low, 'left')
+TO_l = get_toe_off_event(time, ay_filt_l_low, 'left')
 
-# HS and TO should have the same length
-if len(HS) != len(TO):
+HS_r = get_heel_strike_event(time, az_filt_r_low, 'right')
+TO_r = get_toe_off_event(time, ay_filt_r_low, 'right')
+
+# HS and TO should have the same length for the left foot
+if len(HS_l) != len(TO_l):
 
 	# Get difference between lengths
-	diff = len(HS) - len(TO)
+	diff = len(HS_l) - len(TO_l)
 
 	# See which event occurs first.
-	HS_1 = HS[0]
-	TO_1 = TO[0]
+	HS_1 = HS_l[0]
+	TO_1 = TO_l[0]
 
 	if abs(diff) == 1:
 		if HS_1 < TO_1:
-			HS.pop()
+			HS_l.pop()
 		else:
-			del TO[0]
+			del TO_l[0]
+	
+	else:
+		print('Check data set')
+
+# HS and TO should have the same length for the right foot
+if len(HS_r) != len(TO_r):
+
+	# Get difference between lengths
+	diff = len(HS_r) - len(TO_r)
+
+	# See which event occurs first.
+	HS_1 = HS_r[0]
+	TO_1 = TO_r[0]
+
+	if abs(diff) == 1:
+		if HS_1 < TO_1:
+			HS_r.pop()
+		else:
+			del TO_r[0]
 	
 	else:
 		print('Check data set')
 
 
-plt.plot(time, R_ankle_l,'k',label='Resultant Acceleration')
+plt.plot(time, R_ankle_r,'k',label='Resultant Acceleration')
 #plt.plot(time[toe_off], R_ankle_l[toe_off], 'ro', label='Toe-off actual')
 #plt.plot(time[TO], R_ankle_l[TO],'bo', label='Toe-off estimate')
 
 #plt.plot(time[heel_strike], R_ankle_l[heel_strike], 'go', label='Heel-strike actual')
 #plt.plot(time[HS], R_ankle_l[HS],'mo', label='Heel-strike estimate')
 
-plt.vlines(x=time[HS], ymin=min(R_ankle_l), ymax=max(R_ankle_l), colors='r', label='Heel Strike')
+plt.vlines(x=time[HS_r], ymin=min(R_ankle_r), ymax=max(R_ankle_r), colors='r', label='Heel Strike')
 
-plt.vlines(x=time[TO], ymin=min(R_ankle_l), ymax=max(R_ankle_l), colors='g', label='Toe Off')
+plt.vlines(x=time[TO_r], ymin=min(R_ankle_r), ymax=max(R_ankle_r), colors='g', label='Toe Off')
 
-for i in range(len(HS)):
-	plt.axvspan(time[HS[i]], time[TO[i]], alpha=0.5, color='grey')
+for i in range(len(HS_r)):
+	plt.axvspan(time[HS_r[i]], time[TO_r[i]], alpha=0.5, color='grey')
 
 plt.legend()
 
