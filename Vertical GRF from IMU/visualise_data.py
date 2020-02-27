@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from scipy import signal
+from scipy.signal import argrelextrema
 import csv
 
 '''
@@ -13,7 +14,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0049run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0126run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -134,7 +135,7 @@ for i in range(1, len(Fz_filt)-1):
 	
 	if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 		toe_off.append(i+1)
-
+'''
 # Plot 2 seconds of data (2000 points) for observation
 fig, axs = plt.subplots(2)
 
@@ -142,8 +143,8 @@ fig, axs = plt.subplots(2)
 axs[1].plot(time[:4000], ax_filt_r_low[:4000],'r', label='x ankle')
 axs[1].plot(time[:4000], ay_filt_r_low[:4000],'g', label='y ankle')
 axs[1].plot(time[:4000], az_filt_r_low[:4000],'b', label='z ankle')
-axs[1].plot((time[toe_off])[:11], (ay_filt_r_low[toe_off])[:11], 'or', label='toe off')
-#axs[1].plot((time[toe_off])[:11], (az_filt_r_low[toe_off])[:11], 'or', label='toe off')
+axs[1].plot((time[toe_off])[:11], (ay_filt_r_low[toe_off])[:11], 'ok', label='toe off')
+axs[1].plot((time[heel_strike])[:11], (az_filt_r_low[heel_strike])[:11], 'om', label='heel strike')
 axs[1].set_xlabel('Time (s)')
 axs[1].set_ylabel('Acceleration (mm/s^2)')
 axs[1].legend()
@@ -164,7 +165,7 @@ axs[0].set_xlabel('Time (s)')
 axs[0].legend()
 
 plt.show()
-
+'''
 ''' Find the HS and TO events of the left foot '''
 
 def get_heel_strike_event(time: np.array, az: np.array, foot: str):
@@ -179,7 +180,7 @@ def get_heel_strike_event(time: np.array, az: np.array, foot: str):
 
 	if 'l' in foot or 'r' in foot:
 		# All minimas
-		HS = np.where(np.r_[True, az[1:] < az[:-1]] & np.r_[az[:-1] < az[1:], True] == True)[0]
+		HS = argrelextrema(az, np.less)[0]
 
 	else:
 		print('Please enter appropriate label for foot type')
@@ -200,8 +201,8 @@ def get_toe_off_event(time: np.array, ay: np.array, foot: str):
 		# Find all maximas acceleration in the y direction
 
 		# All maximas
-		TO = np.where(np.r_[True, ay[1:] > ay[:-1]] & np.r_[ay[:-1] > ay[1:], True] == True)[0]
-	
+		TO = argrelextrema(ay, np.greater)[0]
+		
 	else:
 		print('Please enter appropriate label for foot type')
 
@@ -213,45 +214,39 @@ TO_l = get_toe_off_event(time, ay_filt_l_low, 'left')
 HS_r = get_heel_strike_event(time, az_filt_r_low, 'right')
 TO_r = get_toe_off_event(time, ay_filt_r_low, 'right')
 
-# HS and TO should have the same length for the left foot
-if len(HS_l) != len(TO_l):
+for i in range(2):
+	if i == 0:
+		# Pointer to left list
+		HS = HS_l
+		TO = TO_l
+		foot = 'left'
+	elif i == 1:
+		# Pointer to right list
+		HS = HS_r
+		TO = TO_r
+		foot = 'right'
 
-	# Get difference between lengths
-	diff = len(HS_l) - len(TO_l)
+	# HS event must be first
+	if HS[0] > TO[0]:
+		del TO[0]
 
-	# See which event occurs first.
-	HS_1 = HS_l[0]
-	TO_1 = TO_l[0]
+	diff = len(HS) - len(TO)
 
-	if abs(diff) == 1:
-		if HS_1 < TO_1:
-			HS_l.pop()
-		else:
-			del TO_l[0]
-	
-	else:
-		print('Check data set')
+	# Length of heel_strike and toe_off should be the same
+	while diff != 0:
+		# HS event must be first
+		if HS[0] > TO[0]:
+			del TO[0]
 
-# HS and TO should have the same length for the right foot
-if len(HS_r) != len(TO_r):
+		# Should be the same number of HS and TO events
+		if len(HS) > len(TO):
+			HS.pop() # Remove last heel strike event
 
-	# Get difference between lengths
-	diff = len(HS_r) - len(TO_r)
+		elif len(TO) > len(HS):
+			TO.pop() # Remove last toe off event
 
-	# See which event occurs first.
-	HS_1 = HS_r[0]
-	TO_1 = TO_r[0]
-
-	if abs(diff) == 1:
-		if HS_1 < TO_1:
-			HS_r.pop()
-		else:
-			del TO_r[0]
-	
-	else:
-		print('Check data set')
-
-
+		diff = len(HS) - len(TO)
+'''
 plt.plot(time, R_ankle_r,'k',label='Resultant Acceleration')
 #plt.plot(time[toe_off], R_ankle_l[toe_off], 'ro', label='Toe-off actual')
 #plt.plot(time[TO], R_ankle_l[TO],'bo', label='Toe-off estimate')
@@ -270,4 +265,283 @@ plt.legend()
 
 plt.xlabel('time (s)')
 plt.ylabel('acceleration (mm/s^2)')
+plt.show()
+'''
+''' Look at accuracy '''
+
+# HS event must be first
+if heel_strike[0] > toe_off[0]:
+	del toe_off[0]
+
+diff = len(heel_strike) - len(toe_off)
+
+# Length of heel_strike and toe_off should be the same
+while diff != 0:
+	# HS event must be first
+	if heel_strike[0] > toe_off[0]:
+		del toe_off[0]
+
+	# Should be the same number of HS and TO events
+	if len(heel_strike) > len(toe_off):
+		heel_strike.pop() # Remove last heel strike event
+
+	elif len(toe_off) > len(heel_strike):
+		toe_off.pop() # Remove last toe off event
+
+	diff = len(heel_strike) - len(toe_off)
+
+# Split heel_strike and toe_off into left and right according to the first indice and comparing to the estimate
+heel_strike_1 = heel_strike[0::2]
+heel_strike_2 = heel_strike[1::2]
+
+toe_off_1 = toe_off[0::2]
+toe_off_2 = toe_off[1::2]
+
+# Flags to indicate if the left foot is using heel_strike_1 or heel_strike_2
+flag_1 = 0
+flag_2 = 0
+
+HS_0 = HS_l[0]
+differences_1 = []
+differences_2 = []
+
+for i in range(5): # Run through first 5 to find the starting point for the left foot
+	differences_1.append(abs(heel_strike_1[i] - HS_0))
+	differences_2.append(abs(heel_strike_2[i] - HS_0))
+
+smallest_diff_1 = differences_1.index(min(differences_1))
+smallest_diff_2 = differences_2.index(min(differences_2))
+
+if differences_1[smallest_diff_1] < differences_2[smallest_diff_2]:
+	# heel strike 1 is for the left foot, starting at smallest_diff_1
+	heel_strike_l = heel_strike_1[smallest_diff_1:]
+	toe_off_l = toe_off_1[smallest_diff_1:]
+
+	flag_1 = 1
+
+else:
+	# heel strike 2 is for the left foot, starting at smallest_diff_2
+	heel_strike_l = heel_strike_2[smallest_diff_2:]
+	toe_off_l = toe_off_2[smallest_diff_2:]
+
+	flag_2 = 1
+
+HS_0 = HS_r[0]
+differences = []
+
+for i in range(5): # Run through first 5 to find the starting point for the right foot
+	if flag_1 == 0:
+		differences.append(abs(heel_strike_1[i] - HS_0))
+	elif flag_2 == 0:
+		differences.append(abs(heel_strike_2[i] - HS_0))
+
+smallest_diff = differences.index(min(differences))
+
+if flag_1 == 0:
+	heel_strike_r = heel_strike_1[smallest_diff:]
+	toe_off_r = toe_off_1[smallest_diff:]
+elif flag_2 == 0:
+	heel_strike_r = heel_strike_2[smallest_diff:]
+	toe_off_r = toe_off_2[smallest_diff:]
+
+# Length of estimated events should be the same as the length of the actual events
+if len(HS_l) != len(heel_strike_l):
+	print('Number of estimated left foot events is different to number of actual events for the left foot.')
+
+diff_l = (len(HS_l) - len(heel_strike_l))
+
+if len(HS_r) != len(heel_strike_r):
+	print('Number of estimated right foot events is different to number of actual events for the right foot.')
+
+diff_r = (len(HS_r) - len(heel_strike_r))
+
+left_differences_HS = [] # In time units
+left_differences_TO = [] # In time units
+
+if diff_l < 0: # More actual events
+	for i in range(len(HS_l)):
+		left_differences_HS.append(abs(time[HS_l[i]] - time[heel_strike_l[i]]))
+		left_differences_TO.append(abs(time[TO_l[i]] - time[toe_off_l[i]]))
+
+elif diff_l > 0: # More estimated events
+	for i in range(len(heel_strike_l)):
+		left_differences_HS.append(abs(time[HS_l[i]] - time[heel_strike_l[i]]))
+		left_differences_TO.append(abs(time[TO_l[i]] - time[toe_off_l[i]]))
+
+else: # Same number of estimated and actual events
+	for i in range(len(HS_l)):
+		left_differences_HS.append(abs(time[HS_l[i]] - time[heel_strike_l[i]]))
+		left_differences_TO.append(abs(time[TO_l[i]] - time[toe_off_l[i]]))
+
+right_differences_HS = [] # In time units
+right_differences_TO = [] # In time units
+
+if diff_r < 0: # More actual events
+	for i in range(len(HS_r)):
+		right_differences_HS.append(abs(time[HS_r[i]] - time[heel_strike_r[i]]))
+		right_differences_TO.append(abs(time[TO_r[i]] - time[toe_off_r[i]]))
+
+elif diff_l > 0: # More estimated events
+	for i in range(len(heel_strike_l)):
+		right_differences_HS.append(abs(time[HS_r[i]] - time[heel_strike_r[i]]))
+		right_differences_TO.append(abs(time[TO_r[i]] - time[toe_off_r[i]]))
+
+else: # Same number of estimated and actual events
+	for i in range(len(HS_l)):
+		right_differences_HS.append(abs(time[HS_r[i]] - time[heel_strike_r[i]]))
+		right_differences_TO.append(abs(time[TO_r[i]] - time[toe_off_r[i]]))
+
+fig, axs = plt.subplots(2, 2)
+
+bp1 = axs[0, 0].boxplot(left_differences_HS)
+plt.setp(bp1['medians'], color='k')
+
+axs[0, 0].set_ylabel('Time difference (s)')
+axs[0, 0].set_xlabel('')
+axs[0, 0].set_title('Left Heel-strike')
+
+axs[0, 0].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp2 = axs[0, 1].boxplot(left_differences_TO)
+plt.setp(bp2['medians'], color='k')
+axs[0, 1].set_ylabel('Time difference (s)')
+axs[0, 1].set_xlabel('')
+axs[0, 1].set_title('Left Toe-off')
+
+axs[0, 1].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp3 = axs[1, 0].boxplot(right_differences_HS)
+plt.setp(bp3['medians'], color='k')
+axs[1, 0].set_ylabel('Time difference (s)')
+axs[1, 0].set_xlabel('')
+axs[1, 0].set_title('Right Heel-strike')
+
+axs[1, 0].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp4 = axs[1, 1].boxplot(right_differences_TO)
+plt.setp(bp4['medians'], color='k')
+axs[1, 1].set_ylabel('Time difference (s)')
+axs[1, 1].set_xlabel('')
+axs[1, 1].set_title('Right Toe-off')
+
+axs[1, 1].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+plt.show()
+
+# Error as a percentage of the event time (from force plate data)
+event_time_l = (time[toe_off_l] - time[heel_strike_l]).tolist()
+event_time_r = (time[toe_off_r] - time[heel_strike_r]).tolist()
+
+left_differences_per_HS = [] # In time units
+left_differences_per_TO = [] # In time units
+
+if diff_l < 0: # More actual events
+	for i in range(len(HS_l)):
+		left_differences_per_HS.append(left_differences_HS[i] / event_time_l[i] * 100)
+		left_differences_per_TO.append(left_differences_TO[i] / event_time_l[i] * 100)
+
+elif diff_l > 0: # More estimated events
+	for i in range(len(heel_strike_l)):
+		left_differences_per_HS.append(left_differences_HS[i] / event_time_l[i] * 100)
+		left_differences_per_TO.append(left_differences_TO[i] / event_time_l[i] * 100)
+
+else: # Same number of estimated and actual events
+	for i in range(len(HS_l)):
+		left_differences_per_HS.append(left_differences_HS[i] / event_time_l[i] * 100)
+		left_differences_per_TO.append(left_differences_TO[i] / event_time_l[i] * 100)
+
+right_differences_per_HS = [] # In time units
+right_differences_per_TO = [] # In time units
+
+if diff_r < 0: # More actual events
+	for i in range(len(HS_r)):
+		right_differences_per_HS.append(right_differences_HS[i] / event_time_r[i] * 100)
+		right_differences_per_TO.append(right_differences_TO[i] / event_time_r[i] * 100)
+
+elif diff_l > 0: # More estimated events
+	for i in range(len(heel_strike_l)):
+		right_differences_per_HS.append(right_differences_HS[i] / event_time_r[i] * 100)
+		right_differences_per_TO.append(right_differences_TO[i] / event_time_r[i] * 100)
+
+else: # Same number of estimated and actual events
+	for i in range(len(HS_l)):
+		right_differences_per_HS.append(right_differences_HS[i] / event_time_r[i] * 100)
+		right_differences_per_TO.append(right_differences_TO[i] / event_time_r[i] * 100)
+
+
+fig, axs = plt.subplots(2, 2)
+
+bp1 = axs[0, 0].boxplot(left_differences_per_HS)
+plt.setp(bp1['medians'], color='k')
+
+axs[0, 0].set_ylabel('Time difference (% event time)')
+axs[0, 0].set_xlabel('')
+axs[0, 0].set_title('Left Heel-strike')
+
+axs[0, 0].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp2 = axs[0, 1].boxplot(left_differences_per_TO)
+plt.setp(bp2['medians'], color='k')
+axs[0, 1].set_ylabel('Time difference (% event time)')
+axs[0, 1].set_xlabel('')
+axs[0, 1].set_title('Left Toe-off')
+
+axs[0, 1].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp3 = axs[1, 0].boxplot(right_differences_per_HS)
+plt.setp(bp3['medians'], color='k')
+axs[1, 0].set_ylabel('Time difference (% event time)')
+axs[1, 0].set_xlabel('')
+axs[1, 0].set_title('Right Heel-strike')
+
+axs[1, 0].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
+bp4 = axs[1, 1].boxplot(right_differences_per_TO)
+plt.setp(bp4['medians'], color='k')
+axs[1, 1].set_ylabel('Time difference (% event time)')
+axs[1, 1].set_xlabel('')
+axs[1, 1].set_title('Right Toe-off')
+
+axs[1, 1].tick_params(
+	axis='x',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom=False,      # ticks along the bottom edge are off
+    top=False,         # ticks along the top edge are off
+    labelbottom=False)
+
 plt.show()
