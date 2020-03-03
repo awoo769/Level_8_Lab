@@ -14,7 +14,7 @@ Auckland Bioengineering Institution
 
 '''
 
-def estimate_GRF(time: np.array, TO: list, HS: list, ay: np.array, m: float):
+def estimate_vGRF(time: np.array, TO: list, HS: list, ay: np.array, m: float):
 
 	# Contact time = toe off - heel strike
 	contact_time = time[TO[:-1]] - time[HS_l[:-1]]
@@ -94,6 +94,8 @@ def estimate_GRF(time: np.array, TO: list, HS: list, ay: np.array, m: float):
 	starting_points = HS[:-1]
 
 	starting_point_previous = 0
+	B_previous = 0
+	C_previous = 0
 
 	j = 0
 
@@ -106,6 +108,8 @@ def estimate_GRF(time: np.array, TO: list, HS: list, ay: np.array, m: float):
 			j += 1 # Increase j
 
 			starting_point_previous = starting_point
+			B_previous = B
+			C_previous = C
 
 		# F(t) = 0 for t < B - C
 		# F(t) = A/2 [1 + cos((t - B) / C * pi)] for B - C < t < B + C
@@ -114,9 +118,9 @@ def estimate_GRF(time: np.array, TO: list, HS: list, ay: np.array, m: float):
 		B = B1[j]
 		C = C1[j]
 		t = time[i]
-		starting_point = time[starting_points[j]]
+		starting_point = time[starting_points[j]] - B + C
 
-		if t < (starting_point + B - C) and t > (starting_point_previous + B + C):
+		if t < (starting_point + B - C) and t > (starting_point_previous + B_previous + C_previous):
 			F1[i] = 0
 		elif t > (starting_point + B + C):
 			F1[i] = 0
@@ -376,6 +380,42 @@ for data_directory in files:
 		if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 			toe_off.append(i+1)
 	
+	# Low-pass filter at 2 Hz, 5 Hz, 10 Hz, 20 Hz, 40 Hz, 50 Hz
+	analog_frequency = 1000
+	order = 4 # Weyand (2017)
+
+	cut_off = [2, 5, 10, 20, 40, 50]
+	c = ['r', 'g', 'b', 'm', 'c', 'y']
+
+	fig, axs = plt.subplots(3)
+	axs[0].set_title('ax')
+	axs[1].set_title('ay')
+	axs[2].set_title('az')
+
+	for i in range(len(cut_off)):
+		b, a = signal.butter(N=order, Wn=cut_off[i]/(analog_frequency/2), btype='low')
+
+		ax_filt_l = signal.filtfilt(b, a, a_x_ankle_l)
+		ay_filt_l = signal.filtfilt(b, a, a_y_ankle_l)
+		az_filt_l = signal.filtfilt(b, a, a_z_ankle_l)
+
+		axs[0].plot(time[:4000], ax_filt_l[:4000], c[i])
+		axs[1].plot(time[:4000], ay_filt_l[:4000], c[i], label=(str(cut_off[i]) + ' Hz'))
+		axs[2].plot(time[:4000], az_filt_l[:4000], c[i])
+
+		axs[0].plot((time[heel_strike])[:11], (ax_filt_l[heel_strike])[:11], 'ok')
+		axs[0].plot((time[toe_off])[:11], (ax_filt_l[toe_off])[:11], 'ok')
+
+		axs[1].plot((time[heel_strike])[:11], (ay_filt_l[heel_strike])[:11], 'ok')
+		axs[1].plot((time[toe_off])[:11], (ay_filt_l[toe_off])[:11], 'ok')
+
+		axs[2].plot((time[heel_strike])[:11], (az_filt_l[heel_strike])[:11], 'ok')
+		axs[2].plot((time[toe_off])[:11], (az_filt_l[toe_off])[:11], 'ok')
+		
+		
+	axs[1].legend()
+	plt.show()
+
 	# Plot 2 seconds of data (2000 points) for observation
 	fig, axs = plt.subplots(2)
 
@@ -825,8 +865,8 @@ for data_directory in files:
 	plt.show()
 	'''
 	# Estimate vertical GRF's
-	#mass = 70.0
-	#force_l = estimate_GRF(time, TO_l, HS_l, ay_filt_l, mass)
+	mass = 70.0
+	force_l = estimate_vGRF(time, TO_l, HS_l, ay_filt_l, mass)
 
 fig, axs = plt.subplots(1, 2)
 
@@ -922,6 +962,3 @@ axs[1].tick_params(
 	labelbottom=False)
 
 plt.show()
-
-
-pause = True
