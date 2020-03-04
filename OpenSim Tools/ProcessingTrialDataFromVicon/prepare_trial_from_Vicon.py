@@ -196,7 +196,7 @@ def prepare_trial_from_Vicon(model: str, trial: str, output_directory: str, inpu
 	for i in range(1,len(grf_headers)):
 		new_grf_data[:,i] = signal.filtfilt(b, a, full_grf_data[:,i], axis=0)
 
-	# Re-zero grfs
+	# Re-zero grfs - force plate data from the trials were recorded on 1 force plate (same for each leg)
 	filter_plate = rezero_filter(original_fy)
 
 	# Re-zero all columns except those which refer to the centre of pressure

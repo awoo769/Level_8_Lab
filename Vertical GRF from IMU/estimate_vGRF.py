@@ -332,6 +332,7 @@ for data_directory in files:
 	# Left coordinate system: y = up, z = towards midline, x = forward direction
 	# Right coordinate system: y = up, z = towards midline, x = backward direction
 
+	'''
 	if abs(max(ax_filt_l)) == max(abs(max(ax_filt_l)), abs(min(ax_filt_l))): # x should be positive
 		pass
 	else:
@@ -339,12 +340,13 @@ for data_directory in files:
 		ax_filt_l = -ax_filt_l
 		az_filt_l = -az_filt_l
 
-	if abs(min(ay_filt_r)) == max(abs(max(ay_filt_r)), abs(min(ay_filt_r))): # x should be negative
+	if abs(min(ax_filt_r)) == max(abs(max(ax_filt_r)), abs(min(ax_filt_r))): # x should be negative
 		pass
 	else:
 		# Rotate 180 deg around the y axis
 		ax_filt_r = -ax_filt_r
 		az_filt_r = -az_filt_r
+	'''
 
 	# Because the IMU's are in different orientations for the left and right leg, we will treat these separately
 
@@ -380,13 +382,37 @@ for data_directory in files:
 		if Fz_filt[i+1] == 0 and Fz_filt[i] != 0:
 			toe_off.append(i+1)
 	
+
+	# Check that the heel strike and toe off events are in the correct order
+	while heel_strike[0] > toe_off[0]:
+		# Remove first toe_off event
+		toe_off = toe_off[1:]
+	
+	while len(heel_strike) > len(toe_off):
+		# Remove last heel strike event
+		heel_strike = heel_strike[:-1]
+	
+	assert len(heel_strike) == len(toe_off)
+
+	# Check that the order of events is HS, TO, HS, TO, ... etc
+	TO_prev = 0
+	for i in range(len(heel_strike)):
+		# The current HS should occur after the previous TO
+		assert heel_strike[i] > TO_prev
+		
+		# The current TO should occur after the last HS
+		assert toe_off[i] > heel_strike[i]
+
+		TO_prev = toe_off[i]
+
+
 	# Low-pass filter at 2 Hz, 5 Hz, 10 Hz, 20 Hz, 40 Hz, 50 Hz
 	analog_frequency = 1000
 	order = 4 # Weyand (2017)
 
 	cut_off = [2, 5, 10, 20, 40, 50]
 	c = ['r', 'g', 'b', 'm', 'c', 'y']
-
+	'''
 	fig, axs = plt.subplots(3)
 	axs[0].set_title('ax')
 	axs[1].set_title('ay')
@@ -412,19 +438,72 @@ for data_directory in files:
 		axs[2].plot((time[heel_strike])[:11], (az_filt_l[heel_strike])[:11], 'ok')
 		axs[2].plot((time[toe_off])[:11], (az_filt_l[toe_off])[:11], 'ok')
 		
-		
 	axs[1].legend()
 	plt.show()
 
+	'''
 	# Plot 2 seconds of data (2000 points) for observation
 	fig, axs = plt.subplots(2)
 
+	ax = ax_filt_r_low.copy()
+	ay = ay_filt_r_low.copy()
+	az = az_filt_r_low.copy()
+	"""
+	nsamples = ax.size
+
+	# regularize datasets by subtracting mean and dividing by s.d.
+	ax -= ax.mean(); ax /= ax.std()
+	az -= az.mean(); az /= az.std()
+
+	from scipy.signal import correlate
+	import scipy
+	import pylab as pyl
+
+	# Find cross-correlation
+	xcorr = correlate(ax, az)
+	dt = np.arange(1-nsamples, nsamples)
+
+	recovered_time_shift = dt[xcorr.argmax()]
+
+	print(recovered_time_shift)
+
+	''' TRY: shift HS depending on how in/out of phase ax and az are '''
+	# Get frequency of oscillations
+	mins = argrelextrema(az, np.less)[0]
+
+	difference = []
+	for i in range(len(mins) - 1):
+		difference.append(mins[i+1] - mins[i])
+	
+	period_av = np.mean(np.array(difference))
+
+	# az and ax would be completely out of phase if the recovered_time_shift was period_av / 2
+	out_of_phase = period_av / 2
+	
+	# So split into quaters.
+	cut_off_1 = period_av / 4
+	cut_off_2 = out_of_phase
+
+	# If the shift is between cut_off 1 and cut_off 3, 
+	if abs(recovered_time_shift) < cut_off_1:
+		shift = int(recovered_time_shift)
+
+	# If the shift is greater than cut_off 2
+	elif recovered_time_shift > cut_off_2:
+		shift = int(recovered_time_shift - out_of_phase)
+
+	elif recovered_time_shift < -cut_off_2:
+		shift = int(recovered_time_shift + out_of_phase)
+
+	print(shift)
+	"""
+
 	# Acceleration data
-	axs[1].plot(time[:4000], ax_filt_r_low[:4000],'r', label='x ankle')
-	axs[1].plot(time[:4000], ay_filt_r_low[:4000],'g', label='y ankle')
-	axs[1].plot(time[:4000], az_filt_r_low[:4000],'b', label='z ankle')
-	axs[1].plot((time[toe_off])[:11], (ay_filt_r_low[toe_off])[:11], 'ok', label='toe off')
-	axs[1].plot((time[heel_strike])[:11], (az_filt_r_low[heel_strike])[:11], 'om', label='heel strike')
+	axs[1].plot(time[:4000], ax[:4000],'r', label='x ankle')
+	axs[1].plot(time[:4000], ay[:4000],'g', label='y ankle')
+	axs[1].plot(time[:4000], az[:4000],'b', label='z ankle')
+	#axs[1].plot((time[toe_off])[:11], (ay[toe_off])[:11], 'ok', label='toe off')
+	axs[1].plot((time[heel_strike])[:11], (az[heel_strike])[:11], 'ok', label='heel strike')
 	axs[1].set_xlabel('Time (s)')
 	axs[1].set_ylabel('Acceleration (mm/s^2)')
 	axs[1].legend()
@@ -467,25 +546,28 @@ for data_directory in files:
 			foot = 'right'
 
 		# HS event must be first
-		if HS[0] > TO[0]:
+		while HS[0] > TO[0]:
+			# Remove the first TO event
 			del TO[0]
 
-		diff = len(HS) - len(TO)
-
 		# Length of heel_strike and toe_off should be the same
-		while diff != 0:
-			# HS event must be first
-			if HS[0] > TO[0]:
-				del TO[0]
+		while len(HS) != len(TO):
+			# Remove last heel strike event (we know that HS is first)
+			del HS[-1]
+	
+		assert len(HS) == len(TO)
 
-			# Should be the same number of HS and TO events
-			if len(HS) > len(TO):
-				HS.pop() # Remove last heel strike event
+		# Check that the order of events is HS, TO, HS, TO, ... etc
+		TO_prev = 0
+		for i in range(len(HS)):
+			# The current HS should occur after the previous TO
+			assert HS[i] > TO_prev
+			
+			# The current TO should occur after the last HS
+			assert TO[i] > HS[i]
 
-			elif len(TO) > len(HS):
-				TO.pop() # Remove last toe off event
+			TO_prev = TO[i]
 
-			diff = len(HS) - len(TO)
 	'''
 	plt.plot(time, R_ankle_r,'k',label='Resultant Acceleration')
 	#plt.plot(time[toe_off], R_ankle_l[toe_off], 'ro', label='Toe-off actual')
@@ -508,27 +590,6 @@ for data_directory in files:
 	plt.show()
 	'''
 	''' Look at accuracy '''
-
-	# HS event must be first
-	if heel_strike[0] > toe_off[0]:
-		del toe_off[0]
-
-	diff = len(heel_strike) - len(toe_off)
-
-	# Length of heel_strike and toe_off should be the same
-	while diff != 0:
-		# HS event must be first
-		if heel_strike[0] > toe_off[0]:
-			del toe_off[0]
-
-		# Should be the same number of HS and TO events
-		if len(heel_strike) > len(toe_off):
-			heel_strike.pop() # Remove last heel strike event
-
-		elif len(toe_off) > len(heel_strike):
-			toe_off.pop() # Remove last toe off event
-
-		diff = len(heel_strike) - len(toe_off)
 
 	# Split heel_strike and toe_off into left and right according to the first indice and comparing to the estimate
 	heel_strike_1 = heel_strike[0::2]
@@ -866,7 +927,26 @@ for data_directory in files:
 	'''
 	# Estimate vertical GRF's
 	mass = 70.0
-	force_l = estimate_vGRF(time, TO_l, HS_l, ay_filt_l, mass)
+	#force_l = estimate_vGRF(time, TO_l, HS_l, ay_filt_l, mass)
+
+	# Calculate RMSE
+	left_differences_HS = np.array(left_differences_HS)
+	HS_RMSE_l = np.sqrt(np.sum(np.power(left_differences_HS, 2)) / len(left_differences_HS))
+	HS_RMSE_r = np.sqrt(np.sum(np.power(right_differences_HS, 2)) / len(right_differences_HS))
+
+	TO_RMSE_l = np.sqrt(np.sum(np.power(left_differences_TO, 2)) / len(left_differences_TO))
+	TO_RMSE_r = np.sqrt(np.sum(np.power(right_differences_TO, 2)) / len(right_differences_TO))
+
+HS_RMSE_all_l = np.sqrt(np.sum(np.power(left_differences_HS_all, 2)) / len(left_differences_HS_all))
+HS_RMSE_all_r = np.sqrt(np.sum(np.power(right_differences_HS_all, 2)) / len(right_differences_HS_all))
+
+TO_RMSE_all_l = np.sqrt(np.sum(np.power(left_differences_TO_all, 2)) / len(left_differences_TO_all))
+TO_RMSE_all_r = np.sqrt(np.sum(np.power(right_differences_TO_all, 2)) / len(right_differences_TO_all))
+
+print('Left HS RMSE: ' + str(HS_RMSE_all_l) + ' s')
+print('Right HS RMSE: ' + str(HS_RMSE_all_r) + ' s')
+print('Left TO RMSE: ' + str(TO_RMSE_all_l) + ' s')
+print('Right TO RMSE: ' + str(TO_RMSE_all_r) + ' s')
 
 fig, axs = plt.subplots(1, 2)
 
