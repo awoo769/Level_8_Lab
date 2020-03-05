@@ -22,7 +22,7 @@ Alex Woodall
 
 '''
 
-def rezero_filter(original_fy: np.ndarray, threshold: int = 20):
+def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
 	'''
 	Resets all values which were originally zero to zero
 
@@ -35,10 +35,10 @@ def rezero_filter(original_fy: np.ndarray, threshold: int = 20):
 
 	'''
 
-	filter_plate = np.zeros(np.shape(original_fy))
+	filter_plate = np.zeros(np.shape(original_fz))
 
 	# Binary test for values greater than 20
-	force_zero = (original_fy > threshold) * 1 # Convert to 1 or 0 rather than True or False
+	force_zero = (original_fz > threshold) * 1 # Convert to 1 or 0 rather than True or False
 
 	# We do not want to accept values which are over 20 but considered 'noise'.
 	# Must be over 20 for more than 35 frames in a row. (Robberechts, 2019) Therefore, need to search for
@@ -51,11 +51,20 @@ def rezero_filter(original_fy: np.ndarray, threshold: int = 20):
 	true_inds = [m.start() for m in re.finditer('(?=11111111111111111111111111111111111)', force_str)]
 
 	# true_inds will not include the ends (e.g., 11...11100000) - will not include the final 3 1's
-	extra_inds = [i + 35 for i in true_inds[0:-1]] # So make another array with 10 added on to all but the last value
+	extra_inds = [i + 35 for i in true_inds[0:-1]] # So make another array with 35 added on to all but the last value
 	
 	# Return the 'filtered' rezeroing array
 	filter_plate[true_inds] = 1
 	filter_plate[extra_inds] = 1
+
+	# For values at the beginning of the array that should be there but are not counted.
+	# For the values that are 1, make the next 35 values also 1.
+	for i in true_inds:
+		if i > 35:
+			break
+		else:
+			filter_plate[i:i+35] = 1
+
 
 	return filter_plate
 
@@ -83,9 +92,9 @@ def read_csv(filename: str):
 	return np.array(data)
 
 
-def prepare_data(data: np.ndarray, dataset_type: str):
+def prepare_data(data: np.ndarray, dataset: list, HS_TO: list, dataset_type: str):
 	'''
-	This function is the main function in preparing the acceleration data.
+	This function creates the dataset of events in which features will be extracted from
 
 	'''
 
@@ -97,9 +106,8 @@ def prepare_data(data: np.ndarray, dataset_type: str):
 	# Right foot
 	a_r = (data[:,7:9+1].T).astype(np.float) # [ax, ay, az]
 
-	# Flip the x acceleration on the right foot. This will make the acceleration profiles on the left and right foot
-	# 'look' the same
-	a_r[0] = -a_r[0] # CHECK IF I CAN DO THIS TODO
+	# Flip the x acceleration on the right foot. This will make the coordinate frames mirrored along the sagittal plane
+	a_r[0] = -a_r[0]
 
 	''' Filter acceleration data at 0.8 Hz and 45 Hz (band-pass) '''
 	analog_frequency = 1000
@@ -138,7 +146,7 @@ def prepare_data(data: np.ndarray, dataset_type: str):
 
 		''' Rezero '''
 		threshold = 20 # 20 N
-		filter_plate = rezero_filter(original_fy=F[1], threshold=threshold)
+		filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
 		
 		for i in range(len(F)): # Fx, Fy, Fz
 			new_F[i,:] = filter_plate * new_F[i,:]
@@ -177,11 +185,45 @@ def prepare_data(data: np.ndarray, dataset_type: str):
 
 			TO_prev = toe_off[i]
 
-	# We now need to split each into individual steps
-	# Extract a period ranging from 200 ms before the HS to 200 ms after TO
-	a = 1
+		# We now need to split each into individual steps
+		# Extract a period ranging from 200 ms before the HS to 200 ms after TO
+		# Because of overlap, take the every second event
+		for i in range(0, len(heel_strike), 2):
+			# If the first heel strike occurs before 200 indices have happened
+			if heel_strike[i] - 200 <= 0:
+				pass
 
-	
+			# If the last toe off occurs within 200 indices of the end
+			elif toe_off[i] + 200 >= len(new_F[2]):
+				pass
+
+			else:
+				start_period = heel_strike[i] - 200
+				end_period = toe_off[i] + 200
+
+				HS_TO.append((heel_strike[i], toe_off[i]))
+
+				temp_l = []
+				temp_l.append(time[start_period:end_period+1])
+				for i in range(len(new_a_l)):
+					temp_l.append((new_a_l[i])[start_period:end_period+1])
+				
+				temp_r = []
+				temp_r.append(time[start_period:end_period+1])
+				for i in range(len(new_a_r)):
+					temp_r.append((new_a_r[i])[start_period:end_period+1])
+
+				dataset.append([temp_l, temp_r])
+		return dataset, HS_TO
+
+
+def get_features(dataset: list):
+	'''
+	This function creates the features which the machine learning algorithm will use
+	to identify the HS and TO events
+
+	'''
+	stuff = 1
 
 if __name__ == '__main__':
 	''' Read in file '''
@@ -191,7 +233,31 @@ if __name__ == '__main__':
 	files = glob.glob('*.{}'.format(ext))
 
 	dataset_type = ['training', 'testing', 'validating']
+	dataset_init = []
+	HS_TO_init = []
 
 	for f in files:
+		print('Running file: ' + str(f))
 		data = read_csv(f)
-		prepare_data(data, dataset_type[0])
+		dataset_init, HS_TO_init = prepare_data(data, dataset_init, HS_TO_init, dataset_type[0])
+	
+	# dataset will have n number of events. Each event has the structure:
+	# left:
+	#	time
+	#	ax
+	#	ay
+	#	az
+	# right
+	#	time
+	#	ax
+	#	ay
+	#	az
+	dataset = dataset_init
+	HS_TO_real = HS_TO_init
+
+	# Constrained peak detection algorithm for RNN - structured prediction model
+	# IC and TO event of the same foot are speparated by at least 35 ms and at most 200 ms
+	# TO and IC event of opposing feet are separated by at least 160 ms and at most 350 ms
+	a = 1
+
+	# A recurrent neural network (RNN) does not involve handcrafting features
