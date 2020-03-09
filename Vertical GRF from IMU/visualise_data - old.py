@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0130run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0126run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')
@@ -70,9 +70,9 @@ cut_off = 2
 order = 4 # Weyand (2017)
 b2, a2 = signal.butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
 
-ax_filt_l = signal.filtfilt(b2, a2, a_x_ankle_l)
-ay_filt_l = signal.filtfilt(b2, a2, a_y_ankle_l)
-az_filt_l = signal.filtfilt(b2, a2, a_z_ankle_l)
+ax_filt_low = signal.filtfilt(b2, a2, a_x_ankle_l)
+ay_filt_low = signal.filtfilt(b2, a2, a_y_ankle_l)
+az_filt_low = signal.filtfilt(b2, a2, a_z_ankle_l)
 #R_ankle_l = np.sqrt(np.power(ax_filt_l, 2) + np.power(ay_filt_l, 2) + np.power(az_filt_l, 2))
 
 ''' Figure out which direction IMU is facing and put in the correct direction if not what is expected '''
@@ -132,7 +132,7 @@ fig, axs = plt.subplots(2)
 axs[1].plot(time[:4000], ax_filt_l[:4000],'r', label='x ankle')
 axs[1].plot(time[:4000], ay_filt_l[:4000],'g', label='y ankle')
 axs[1].plot(time[:4000], az_filt_l[:4000],'b', label='z ankle')
-axs[1].plot((time[toe_off])[:11], (ay_filt_l[toe_off])[:11], 'or', label='toe off')
+axs[1].plot((time[heel_strike])[:11], (ay_filt_l[heel_strike])[:11], 'or', label='toe off')
 axs[1].set_xlabel('Time (s)')
 axs[1].set_ylabel('Acceleration (mm/s^2)')
 axs[1].legend()

@@ -5,6 +5,8 @@ import csv
 from scipy import signal
 import re
 from matplotlib import pylab as plt
+import openpyxl
+from pathlib import Path
 '''
 This script prepares acceleration data from ankle worn IMU's to find HS and TO events using a machine
 learning process.
@@ -92,7 +94,7 @@ def read_csv(filename: str):
 	return np.array(data)
 
 
-def prepare_data(data: np.ndarray, dataset: list, HS_TO: list, dataset_type: str):
+def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type: str, first_flag: bool, example_length: int):
 	'''
 	This function creates the dataset of events in which features will be extracted from
 
@@ -186,8 +188,11 @@ def prepare_data(data: np.ndarray, dataset: list, HS_TO: list, dataset_type: str
 			TO_prev = toe_off[i]
 
 		# We now need to split each into individual steps
-		# Extract a period ranging from 200 ms before the HS to 200 ms after TO
+		# Extract a period ranging from 200 ms before the HS to 200 ms after TO for the first
+		# event. We will then use this length for the remainder of the steps (needs to be the
+		# same size for ML)
 		# Because of overlap, take the every second event
+
 		for i in range(0, len(heel_strike), 2):
 			# If the first heel strike occurs before 200 indices have happened
 			if heel_strike[i] - 200 <= 0:
@@ -198,32 +203,47 @@ def prepare_data(data: np.ndarray, dataset: list, HS_TO: list, dataset_type: str
 				pass
 
 			else:
-				start_period = heel_strike[i] - 200
-				end_period = toe_off[i] + 200
+				if first_flag == False:
+					start_period = heel_strike[i] - 200
+					end_period = toe_off[i] + 200
+					example_length = end_period - start_period
+					first_flag = True
+				else:
+					event_length = toe_off[i] - heel_strike[i]
+					difference = example_length - event_length
 
-				HS_TO.append((heel_strike[i], toe_off[i]))
+					start_add = int(difference / 2)
+					end_add = difference - start_add
 
-				temp_l = []
-				temp_l.append(time[start_period:end_period+1])
-				for i in range(len(new_a_l)):
-					temp_l.append((new_a_l[i])[start_period:end_period+1])
+					start_period = heel_strike[i] - start_add
+					end_period = toe_off[i] + end_add
+
+				# Append heel strikes and toe offs which are within the range
+				HS = np.array(heel_strike)
+				overlap_HS = np.intersect1d(HS[HS <= end_period], HS[HS >= start_period])
+				# Convert into new timeframe
+				overlap_HS = overlap_HS - start_period
+
+				TO = np.array(toe_off)
+				overlap_TO = np.intersect1d(TO[TO <= end_period], TO[TO >= start_period])
 				
-				temp_r = []
-				temp_r.append(time[start_period:end_period+1])
+				# Convert into new timeframe
+				overlap_TO = overlap_TO - start_period
+				
+				HS_TO.append((overlap_HS, overlap_TO))
+
+				temp = []
+				for i in range(len(new_a_l)):
+					temp.append((new_a_l[i])[start_period:end_period+1])
+				
 				for i in range(len(new_a_r)):
-					temp_r.append((new_a_r[i])[start_period:end_period+1])
+					temp.append((new_a_r[i])[start_period:end_period+1])
 
-				dataset.append([temp_l, temp_r])
-		return dataset, HS_TO
-
-
-def get_features(dataset: list):
-	'''
-	This function creates the features which the machine learning algorithm will use
-	to identify the HS and TO events
-
-	'''
-	stuff = 1
+				if np.size(dataset) == 0:
+					dataset = (np.array(temp))[np.newaxis, :]
+				else:
+					dataset = np.vstack((dataset, (np.array(temp))[np.newaxis, :]))
+		return dataset, HS_TO, first_flag, example_length
 
 if __name__ == '__main__':
 	''' Read in file '''
@@ -233,14 +253,37 @@ if __name__ == '__main__':
 	files = glob.glob('*.{}'.format(ext))
 
 	dataset_type = ['training', 'testing', 'validating']
-	dataset_init = []
+	dataset_init = np.array([])
 	HS_TO_init = []
+	first_flag = False
+	example_length = 0 # Will be overwritten in first run
+
+	
+	xlsx_file = Path(path, 'Subject details.xlsx')
+	wb_obj = openpyxl.load_workbook(xlsx_file)
+	sheet = wb_obj.active
+
+	subject_information = []
+
+	for row in sheet.iter_rows():
+		temp_info = []
+
+		for cell in row:
+			temp_info.append(cell.value)
+		
+		# List of subject information: ID, Gender, Height, Weight
+		subject_information.append(temp_info)
+	subject_information = np.array(subject_information)
 
 	for f in files:
 		print('Running file: ' + str(f))
 		data = read_csv(f)
-		dataset_init, HS_TO_init = prepare_data(data, dataset_init, HS_TO_init, dataset_type[0])
+		dataset_init, HS_TO_init, first_flag, example_length = prepare_data(data, dataset_init, HS_TO_init, dataset_type[0], first_flag, example_length)
 	
+
+		# Get mass and height data from 'Subject details.xlsx'
+
+
 	# dataset will have n number of events. Each event has the structure:
 	# left:
 	#	time
@@ -252,12 +295,19 @@ if __name__ == '__main__':
 	#	ax
 	#	ay
 	#	az
-	dataset = dataset_init
-	HS_TO_real = HS_TO_init
 
-	# Constrained peak detection algorithm for RNN - structured prediction model
-	# IC and TO event of the same foot are speparated by at least 35 ms and at most 200 ms
-	# TO and IC event of opposing feet are separated by at least 160 ms and at most 350 ms
-	a = 1
+	# Shape of each event in the dataset
+	# (636, 6) = (636, [ax_l, ay_l, az_l, ax_r, ay_r, az_r])
+	# 636 is set in the first event as 200 below HS and 200 above TO.
 
-	# A recurrent neural network (RNN) does not involve handcrafting features
+	# Shape of the entire dataset
+	#(n, 636, 6)
+	dataset = np.swapaxes(dataset_init, 1, 2)
+
+	# Shape of the correct HS and TO events for each event
+	# (n, 2) where the '2' is a tuple of HS and TO times which occur during the sample
+	HS_TO = HS_TO_init
+
+	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\dataset.npy", dataset)
+	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\HS_TO.npy", HS_TO)
+	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\subject_information.npy", subject_information)
