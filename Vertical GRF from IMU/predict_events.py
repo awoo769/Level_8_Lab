@@ -1,10 +1,10 @@
 import tensorflow
-
 from keras.models import Sequential
 from keras.layers import LSTM
 from keras.layers import Dense
 from keras.layers import TimeDistributed
 from keras.layers import Bidirectional
+
 import numpy as np
 from numpy import array
 from random import random
