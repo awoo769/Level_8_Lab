@@ -1,9 +1,6 @@
-import tensorflow
+import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import LSTM
-from keras.layers import Dense
-from keras.layers import TimeDistributed
-from keras.layers import Bidirectional
+from keras.layers import Dense, LSTM, TimeDistributed, Dropout, Bidirectional
 
 import numpy as np
 from numpy import array
@@ -11,78 +8,162 @@ from random import random
 from numpy import cumsum
 from matplotlib import pyplot
 from pandas import DataFrame
+import sys
 
 from matplotlib import pyplot as plt
 
-# create a sequence classification instance
-def get_sequence(n_timesteps):
-	# create a sequence of random numbers in [0,1]
-	X = array([random() for _ in range(10)])
+# Disables the tensorflow AVX2 warning, doesn't enable AVX2
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-	# calculate cut-off value to change class values
-	limit = n_timesteps/4.0
+def construct_model(hidden = 32, lstm_layers = 2, input_dim = 6, output_dim = 1):
+    model = Sequential()
+    model.add(LSTM(input_shape=(None, input_dim), return_sequences=True, units=hidden))
 
-	# determine the class outcome for each item in cumulative sequence
-	y = array([0 if x < limit else 1 for x in cumsum(X)])
+    for _ in range(lstm_layers-1):
+        model.add(LSTM(return_sequences=True, units=hidden))
+
+    model.add(TimeDistributed(Dense(output_dim, activation='sigmoid')))
+    model.compile(loss=weighted_binary_crossentropy, optimizer='sgd', metrics=['accuracy'])
+
+    return model
+
+
+def weighted_binary_crossentropy(y_true, y_pred):
+	# Assume this is HS/FS (foot strike)
+	a1 = tf.keras.backend.mean(tf.keras.backend.binary_crossentropy(y_pred[0,:], y_true[0,:]) * (y_true[0,:] + 0.01), axis=-1) # try + 0.001
 	
-	# Expected structure of an LSTM has the dimensions [samples, timesteps, features]
-	# reshape input and output data to be suitable for LSTMs
-	X = X.reshape(1, n_timesteps, 1)
-	y = y.reshape(1, n_timesteps, 1)
+	# Assume this is TO/FO (foot off)
+	a2 = tf.keras.backend.mean(tf.keras.backend.binary_crossentropy(y_pred[1,:], y_true[1,:]) * (y_true[1,:] + 0.01), axis=-1)
 
-	return X, y
+	return a1 + a2
 
-def get_lstm_model(n_timesteps, backwards):
-	model = Sequential()
-	model.add(LSTM(20, input_shape=(n_timesteps, 1), return_sequences=True, go_backwards=backwards))
-	model.add(TimeDistributed(Dense(1, activation='sigmoid')))
-	model.compile(loss='binary_crossentropy', optimizer='adam')
 
-	return model
+def plot_history(history):
+    nepoch = len(history.history['loss'])
 
-def get_bi_lstm_model(n_timesteps, mode):
-	model = Sequential()
-	model.add(Bidirectional(LSTM(20, return_sequences=True), input_shape=(n_timesteps, 1), merge_mode=mode))
-	model.add(TimeDistributed(Dense(1, activation='sigmoid')))
-	model.compile(loss='binary_crossentropy', optimizer='adam')
+    plt.plot(range(nepoch),history.history['loss'],'r')
+    plt.plot(range(nepoch),history.history['val_loss'],'b')
 
-	return model
+    axes = plt.gca()
+    axes.set_ylim([0.001,0.005])
 
-def train_model(model, n_timesteps):
-	loss = list()
-	for _ in range(250):
-		# generate new random sequence
-		X, y = get_sequence(n_timesteps)
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper right')
+    plt.show()
 
-		# fit model for one epoch on this sequence
-		hist = model.fit(X, y, epochs=1, batch_size=1, verbose=0)
-		loss.append(hist.history['loss'][0])
+def peakdet(v, delta, x = None):
+    """
+    Converted from MATLAB script at http://billauer.co.il/peakdet.html
+    
+    Returns two arrays
+    
+    function [maxtab, mintab]=peakdet(v, delta, x)
+    %PEAKDET Detect peaks in a vector
+    %        [MAXTAB, MINTAB] = PEAKDET(V, DELTA) finds the local
+    %        maxima and minima ("peaks") in the vector V.
+    %        MAXTAB and MINTAB consists of two columns. Column 1
+    %        contains indices in V, and column 2 the found values.
+    %      
+    %        With [MAXTAB, MINTAB] = PEAKDET(V, DELTA, X) the indices
+    %        in MAXTAB and MINTAB are replaced with the corresponding
+    %        X-values.
+    %
+    %        A point is considered a maximum peak if it has the maximal
+    %        value, and was preceded (to the left) by a value lower by
+    %        DELTA.
+    
+    % Eli Billauer, 3.4.05 (Explicitly not copyrighted).
+    % This function is released to the public domain; Any use is allowed.
+    
+    """
+    maxtab = []
+    mintab = []
+       
+    if x is None:
+        x = np.arange(len(v))
+    
+    v = np.asarray(v)
+    
+    if len(v) != len(x):
+        sys.exit('Input vectors v and x must have same length')
+    
+    if not np.isscalar(delta):
+        sys.exit('Input argument delta must be a scalar')
+    
+    if delta <= 0:
+        sys.exit('Input argument delta must be positive')
+    
+    mn, mx = np.Inf, -np.Inf
+    mnpos, mxpos = np.NaN, np.NaN
+    
+    lookformax = True
+    
+    for i in np.arange(len(v)):
+        this = v[i]
+        if this > mx:
+            mx = this
+            mxpos = x[i]
+        if this < mn:
+            mn = this
+            mnpos = x[i]
+        
+        if lookformax:
+            if this < mx-delta:
+                maxtab.append((mxpos, mx))
+                mn = this
+                mnpos = x[i]
+                lookformax = False
+        else:
+            if this > mn+delta:
+                mintab.append((mnpos, mn))
+                mx = this
+                mxpos = x[i]
+                lookformax = True
 
-	return loss
+    return array(maxtab), array(mintab)
 
-'''
-# define problem properties
-n_timesteps = 10
-results = DataFrame()
 
-# lstm forwards
-model = get_lstm_model(n_timesteps, False)
-results['lstm_forw'] = train_model(model, n_timesteps)
+def peak_cmp(annotated, predicted):
+    dist = []
+    if len(predicted) == 0 or len(annotated) == 0:
+        return -1
+    if len(predicted) != len(annotated):
+        return -1
+    
+    for a in annotated:
+        dist = dist + [min(np.abs(predicted - a))]
+    if not len(dist):
+        return -1
+    return min(dist)
 
-# lstm backwards
-model = get_lstm_model(n_timesteps, True)
-results['lstm_back'] = train_model(model, n_timesteps)
 
-# bidirectional concat
-model = get_bi_lstm_model(n_timesteps, 'concat')
-results['bilstm_con'] = train_model(model, n_timesteps)
+def eval_prediction(likelihood, true, patient, plot = True, shift = 0):
+    sdist = []
+    
+    peakind = peakdet(likelihood[:,0],0.5)
+    for k,_ in peakind[0]:
+        if plot:
+            plt.axvline(x=k)
+    sdist.append(peak_cmp(np.where(true[:,0] > 0.5)[0], [k + shift for k,v in peakind[0]]))
 
-# line plot of results
-results.plot()
-pyplot.show()
-'''
+    if plot:
+        plt.plot(likelihood) # continous likelihood process
+        plt.plot(true) # spikes on events
+        plt.title(patient)
+        axes = plt.gca()
+        axes.set_xlim([0,true.shape[0]])
+        plt.show()
+    return sdist
+
+
 if __name__ == '__main__':
-	# Load datasets and real outputs
+
+	model = construct_model()
+
+	# Load datasets and true outputs
 	dataset = np.load(file="C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\dataset.npy", allow_pickle=True)
 	HS_TO = np.load(file="C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\HS_TO.npy", allow_pickle=True)
 
@@ -109,6 +190,6 @@ if __name__ == '__main__':
 
 	a = 1
 
-	# Constrained peak detection algorithm for RNN - structured prediction model
+	# Constrained peak detection algorithm for RNN - structured prediction model TODO - see if this is needed first
 	# IC and TO event of the same foot are speparated by at least 35 ms and at most 200 ms
 	# TO and IC event of opposing feet are separated by at least 160 ms and at most 350 ms

@@ -229,8 +229,14 @@ def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type:
 				
 				# Convert into new timeframe
 				overlap_TO = overlap_TO - start_period
-				
-				HS_TO.append((overlap_HS, overlap_TO))
+
+				# HS_TO will have 0's where there is no event and a 1 where there is.
+				# Two columns per trial. 1st = HS, 2nd = TO
+				temp_HS_TO = np.zeros((example_length + 1, 2))
+				(temp_HS_TO[:,0])[overlap_HS] = 1.0
+				(temp_HS_TO[:,1])[overlap_TO] = 1.0
+
+				HS_TO.append(temp_HS_TO)
 
 				temp = []
 				for i in range(len(new_a_l)):
@@ -305,8 +311,9 @@ if __name__ == '__main__':
 	dataset = np.swapaxes(dataset_init, 1, 2)
 
 	# Shape of the correct HS and TO events for each event
-	# (n, 2) where the '2' is a tuple of HS and TO times which occur during the sample
-	HS_TO = HS_TO_init
+	# (n, 636, 2) where the '2' is an array of either 0 or 1 for the particular time
+	# 0 if no event, 1 if event. The first column is HS and the second is TO
+	HS_TO = np.array(HS_TO_init)
 
 	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\dataset.npy", dataset)
 	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\HS_TO.npy", HS_TO)
