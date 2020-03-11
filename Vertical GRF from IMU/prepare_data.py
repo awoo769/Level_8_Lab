@@ -292,23 +292,21 @@ if __name__ == '__main__':
 
 	# dataset will have n number of events. Each event has the structure:
 	# left:
-	#	time
 	#	ax
 	#	ay
 	#	az
-	# right
-	#	time
+	# right:
 	#	ax
 	#	ay
 	#	az
 
 	# Shape of each event in the dataset
-	# (636, 6) = (636, [ax_l, ay_l, az_l, ax_r, ay_r, az_r])
+	# (636, 6) = (636, [ax_l, ay_l, az_l, ax_r, ay_r, az_r], 636)
 	# 636 is set in the first event as 200 below HS and 200 above TO.
 
 	# Shape of the entire dataset
-	#(n, 636, 6)
-	dataset = np.swapaxes(dataset_init, 1, 2)
+	# (n, 636, 6)
+	dataset = np.swapaxes(dataset_init, 1, -1)
 
 	# Shape of the correct HS and TO events for each event
 	# (n, 636, 2) where the '2' is an array of either 0 or 1 for the particular time
