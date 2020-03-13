@@ -12,17 +12,21 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # Construct the model
-def construct_model(units: int = 32, lstm_layers: int = 2, input_shape: int = (636, 6), output_dim: int = 1):
+def construct_model(units: int = 32, lstm_layers: int = 2, input_shape: int = (636, 6), output_dim: int = 1, weights: np.ndarray = None):
 	model = keras.Sequential()
-	model.add(keras.layers.LSTM(units, input_shape=input_shape, return_sequences=True))
+	model.add(keras.layers.Bidirectional(keras.layers.LSTM(units, return_sequences=True, input_shape=input_shape), input_shape=input_shape))
 	
 	for _ in range(lstm_layers-1):
-		model.add(keras.layers.LSTM(units, return_sequences=True))
+		model.add(keras.layers.Bidirectional(keras.layers.LSTM(units, return_sequences=True)))
+		#model.add(keras.layers.LSTM(units, return_sequences=True))
+
+	loss = weighted_categorical_crossentropy(weights)
 	
-	model.add(keras.layers.TimeDistributed(keras.layers.Dense(output_dim, activation='sigmoid')))
-	model.compile(loss=weighted_binary_crossentropy, optimizer='sgd', metrics=['accuracy'])
+	model.add(keras.layers.TimeDistributed(keras.layers.Dense(output_dim, activation='softmax'))) #activation=sigmoid
+	model.compile(loss=loss, optimizer='sgd', metrics=['accuracy'])
 
 	return model
+
 
 # Create loss function
 def weighted_binary_crossentropy(y_true, y_pred):
@@ -30,33 +34,78 @@ def weighted_binary_crossentropy(y_true, y_pred):
 
 	# adding 0.01 so nothing is multiplied by 0
 	l = keras.backend.mean(keras.backend.binary_crossentropy(y_pred[:,0], y_true[:,0]) * (y_true[:,0] + 0.01), axis=-1)
-
+	#l1 = keras.backend.mean(keras.backend.binary_crossentropy(y_pred[:,0], y_true[:,0]) * (y_true[:,0] + 0.01), axis=-1)
+	#l2 = keras.backend.mean(keras.backend.binary_crossentropy(y_pred[:,1], y_true[:,1]) * (y_true[:,1] + 0.01), axis=-1)
+	#l = l1 + l2
+	
 	return l
 
+def weighted_categorical_crossentropy(weights):
+	"""
+	A weighed version of keras.objectives.categorical_crossentropy
 
+	Variables:
+		weights: numpy array of shape (C,) where C is the number of classes
+	
+	Usage:
+		weights: np.array([0.5, 2, 10]) # Class 1 at 0.5, class 2 twice the normal weights, class 3 10x
+		loss = weighted_categorical_crossentropy(weights)
+		model.compile(loss=loss,optimizer='sgd')
+
+	"""
+	
+	# We have 3 categories. y_true[:,0] = no event, y_true[:,1] = FS, y_true[:,2] = FO
+	# We want there to be a significantly higher weighting for the FS and FO than the no event.
+	weights = keras.backend.variable(weights)
+
+	def loss(y_true, y_pred):
+		# Scale predictions so that the class probabilities of each sample sum to 1
+		y_pred /= keras.backend.sum(y_pred, axis=-1, keepdims=True)
+		# clibp to prevent NaN's and Inf's
+		y_pred = keras.backend.clip(y_pred, keras.backend.epsilon(), 1 - keras.backend.epsilon())
+
+		# calc
+		loss = y_true * keras.backend.log(y_pred) * weights
+		loss = -keras.backend.sum(loss, -1)
+
+		return loss
+	
+	return loss
 # Train the model
-def train_model(model = None, x: np.ndarray = None, y: np.ndarray = None, batch_size: int = 32, nepochs: int = None):
+def train_model(model = None, x: np.ndarray = None, y: np.ndarray = None, batch_size: int = 32, nepochs: int = None, validation: str = False, validation_data: np.ndarray = None, validation_truths: np.ndarray = None):
 	# x shape = (n_samples, n_timesteps, n_features)
 	# y shape = (n_samples, n_timesteps) - binary_results
-	history = model.fit(x=x, y=y, batch_size=32, epochs=20) #, callbacks=[tensorboard])#, validation_data=(validation_data, validation_truths))
+	if validation:
+		history = model.fit(x=x, y=y, batch_size=batch_size, epochs=nepochs, validation_data=(validation_data, validation_truths))
+	else:
+		history = model.fit(x=x, y=y, batch_size=batch_size, epochs=nepochs) #, callbacks=[tensorboard])
 
 	return history
 
 
 # Save the model
 def save_model(model = None, save_dir: str = None, model_type: str = None):
-	model.save(save_dir + model_type + '.h5')
+	model.save(save_dir + model_type + '_new.h5')
 
+
+def predict_model(model = None, x: np.ndarray = None):
+	# Make sure that the input data is in the correct shape
+	# (n, 636, 6)
+	if x.shape[1:] != (636, 6):
+		print('Input data does not have the correct shape')
+	
+	else:
+		output = model.predict(x)
+		peak_ind = peak_det(output, 0.5)
+	
+	return peak_ind
 
 # Plot training history
-def plot_history(history):
+def plot_history(history, model_type: str = None, save_dir: str = None):
 	nepoch = len(history.history['loss'])
 
 	plt.plot(range(nepoch),history.history['loss'],'r')
 	plt.plot(range(nepoch),history.history['val_loss'],'b')
-
-	axes = plt.gca()
-	axes.set_ylim([0.001,0.005])
 
 	plt.title('model loss')
 	plt.ylabel('loss')
@@ -64,8 +113,21 @@ def plot_history(history):
 	plt.legend(['train', 'validation'], loc='upper right')
 	plt.show()
 
+	plt.savefig(save_dir + model_type + '_loss.png')
+
+	plt.plot(range(nepoch),history.history['accuracy'],'r')
+	plt.plot(range(nepoch),history.history['val_accuracy'],'b')
+
+	plt.title('model accuracy')
+	plt.ylabel('accuracy')
+	plt.xlabel('epoch')
+	plt.legend(['train', 'validation'], loc='upper right')
+	plt.show()
+
+	plt.savefig(save_dir + model_type + '_accuracy.png')
+
 # Detect peaks
-def peakdet(v, delta, x = None):
+def peak_det(v, delta, x = None):
 	"""
 	Converted from MATLAB script at http://billauer.co.il/peakdet.html
 	
@@ -90,6 +152,11 @@ def peakdet(v, delta, x = None):
 	% This function is released to the public domain; Any use is allowed.
 	
 	"""
+
+	# Constrained peak detection algorithm for RNN - structured prediction model TODO - see if this is needed first
+	# IC and TO event of the same foot are speparated by at least 35 ms and at most 200 ms
+	# TO and IC event of opposing feet are separated by at least 160 ms and at most 350 ms
+
 	maxtab = []
 	mintab = []
 	   
@@ -136,6 +203,7 @@ def peakdet(v, delta, x = None):
 
 	return np.array(maxtab), np.array(mintab)
 
+
 # Compare predicted to true
 def peak_cmp(annotated, predicted):
 	dist = []
@@ -150,18 +218,20 @@ def peak_cmp(annotated, predicted):
 		return -1
 	return min(dist)
 
+
 # Evaluate the model predition
-def eval_prediction(likelihood, true, patient, plot = True, shift = 0):
+def eval_prediction(likelihood_HS, likelihood_TO, true, patient, plot = True, shift = 0):
 	sdist = []
 	
-	peakind = peakdet(likelihood[:,0],0.5)
+	n_samples = likelihood_HS.shape[0]
+	peakind = peak_det(likelihood_HS[0],0.5)
 	for k,_ in peakind[0]:
 		if plot:
 			plt.axvline(x=k)
 	sdist.append(peak_cmp(np.where(true[:,0] > 0.5)[0], [k + shift for k,_ in peakind[0]]))
 
 	if plot:
-		plt.plot(likelihood) # continous likelihood process
+		plt.plot(likelihood_HS) # continous likelihood process
 		plt.plot(true) # spikes on events
 		plt.title(patient)
 		axes = plt.gca()
