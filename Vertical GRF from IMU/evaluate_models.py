@@ -32,37 +32,19 @@ def get_models(directory: str = None):
 
 if __name__ == '__main__':
 
-	# Directory
-	directory = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\"
+	# data folder
+	data_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\'
+
+	# models folder
+	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
 
 	# Load datasets and true outputs
-	dataset = np.load(file=directory + "data\\dataset.npy", allow_pickle=True)
-	HS_TO = np.load(file=directory + "data\\HS_TO.npy", allow_pickle=True)
+	X_test = np.load(file=data_folder + "X_test.npy", allow_pickle=True)
+	y_test = np.load(file=data_folder + "y_test", allow_pickle=True)
+	weights = np.load(file=models_folder + "weights.npy", allow_pickle=True)
 
-	# Load models
-	#model_HS, model_TO = get_models(directory)
+	# Load model
+	model = keras.models.load_model(models_folder + 'foot_events.h5', custom_objects={'loss': weighted_categorical_crossentropy(weights)})
+	likelihood = model.predict(y_test)
 
-	n_samples = len(dataset)
-	n_training = int(n_samples * 0.9)
-
-	training_data = dataset[:n_training]
-	validation_data = dataset[n_training:]
-
-	training_truths = HS_TO[:n_training]
-	validation_truths = HS_TO[n_training:]
-
-	#likelihood_HS = model_HS.predict(validation_data)
-	#likelihood_TO = model_TO.predict(validation_data)
-
-	
-	y_true = HS_TO[:,:,0] + HS_TO[:,:,1] * -1
-	y_training = y_true[:n_training]
-	y_validation = y_true[n_training:]
-
-
-	#eval_prediction(likelihood_HS, likelihood_TO, validation_truths, 'testing')
-	weights = np.array([636/632, 636/2, 636/2])
-	model = keras.models.load_model(directory + '\\models\\neither_new.h5', custom_objects={'loss': weighted_categorical_crossentropy(weights)})
-	likelihood = model.predict(validation_data)
-
-	a =1
+	a = 1

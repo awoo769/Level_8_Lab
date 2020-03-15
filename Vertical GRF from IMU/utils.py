@@ -84,8 +84,8 @@ def train_model(model = None, x: np.ndarray = None, y: np.ndarray = None, batch_
 
 
 # Save the model
-def save_model(model = None, save_dir: str = None, model_type: str = None):
-	model.save(save_dir + model_type + '_new.h5')
+def save_model(model = None, save_dir: str = None, name: str = None):
+	model.save(save_dir + name)
 
 
 def predict_model(model = None, x: np.ndarray = None):
@@ -101,7 +101,7 @@ def predict_model(model = None, x: np.ndarray = None):
 	return peak_ind
 
 # Plot training history
-def plot_history(history, model_type: str = None, save_dir: str = None):
+def plot_history(history, name: str = None, save_dir: str = None):
 	nepoch = len(history.history['loss'])
 
 	plt.plot(range(nepoch),history.history['loss'],'r')
@@ -113,7 +113,7 @@ def plot_history(history, model_type: str = None, save_dir: str = None):
 	plt.legend(['train', 'validation'], loc='upper right')
 	plt.show()
 
-	plt.savefig(save_dir + model_type + '_loss.png')
+	plt.savefig(save_dir + name + '_loss.png')
 
 	plt.plot(range(nepoch),history.history['accuracy'],'r')
 	plt.plot(range(nepoch),history.history['val_accuracy'],'b')
@@ -124,7 +124,7 @@ def plot_history(history, model_type: str = None, save_dir: str = None):
 	plt.legend(['train', 'validation'], loc='upper right')
 	plt.show()
 
-	plt.savefig(save_dir + model_type + '_accuracy.png')
+	plt.savefig(save_dir + name + '_accuracy.png')
 
 # Detect peaks
 def peak_det(v, delta, x = None):

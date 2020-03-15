@@ -11,6 +11,8 @@ import sys
 
 from matplotlib import pyplot as plt
 
+from sklearn.model_selection import train_test_split
+
 # Disables the tensorflow AVX2 warning, doesn't enable AVX2
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -19,42 +21,42 @@ from utils import construct_model, train_model, save_model, plot_history
 
 if __name__ == '__main__':
 
+	# data folder
+	data_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\'
+
+	# models folder
+	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
+
 	# Load datasets and true outputs
-	dataset = np.load(file="C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\dataset.npy", allow_pickle=True)
-	HS_TO = np.load(file="C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\HS_TO.npy", allow_pickle=True)
+	dataset = np.load(file=data_folder + 'dataset.npy', allow_pickle=True)
+	HS_TO = np.load(file= data_folder + 'HS_TO.npy', allow_pickle=True)
 
-	# Train on 90 % of data, test on 10 %
-	# For now, use bottom 10 %.
-
-	n_samples = len(dataset)
-
-	n_training = int(n_samples * 0.9)
-
-	training_data = dataset[:n_training]
-	validation_data = dataset[n_training:]
-
-	training_truths = HS_TO[:n_training]
-	validation_truths = HS_TO[n_training:]
+	# Train on 80 % of data, test on 20 %
 
 	# Another option. 3 classes. 0 = no event, 1 = foot strike, 2 = foot off
 	y = HS_TO[:,:,0] * 1 + HS_TO[:,:,1] * 2
 	y_true = keras.utils.to_categorical(y)
 
+	X_train, X_test, y_train, y_test = train_test_split(dataset, y_true, test_size=0.2)
+
+	# Save datasets
+	np.save(models_folder + 'X_train.npy', X_train)
+	np.save(models_folder + 'y_train.npy', y_train)
+	np.save(models_folder + 'X_test.npy', X_test)
+	np.save(models_folder + 'y_test.npy', y_test)
+
 	# Weighting for each event
-	weights = np.array([636/632, 636/2, 636/2])
-
-	y_training = y_true[:n_training]
-	y_validation = y_true[n_training:]
-
+	weights = np.array([10, 300, 350])
+	np.save(models_folder + 'weights.npy', weights)
 
 	# Each timestep has 6 "features" (ax_L, ay_L, az_L, ax_R, ay_R, az_R)
 	# Shape of dataset = (n, 636, 6)
 
 	# To plot:
-	#plt.plot(training_data[0,:,1]) # Left y acceleration
-	#plt.plot(training_data[0,:,4]) # Right y acceleration
-	#plt.plot(training_truths[0,:,0]*100,'g') # HS
-	#plt.plot(training_truths[0,:,1]*100, 'r') # TO
+	#plt.plot(X_train[0,:,1]) # Left y acceleration
+	#plt.plot(X_train[0,:,4]) # Right y acceleration
+	#plt.plot(y_train[0,:,0]*100,'g') # HS
+	#plt.plot(y_train[0,:,1]*100, 'r') # TO
 	#plt.show()
 
 	# Contstruct the model
@@ -62,42 +64,34 @@ if __name__ == '__main__':
 
 	#tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 
-	model_type = 'neither' # HS or TO or both
-
-	history = train_model(model, training_data, y_training, 32, 15, validation=True, validation_data=validation_data, validation_truths=y_validation)
-
-	if model_type == 'HS':
-		history = train_model(model, training_data, training_truths[:,:,0], 32, 4, validation=True, validation_data=validation_data, validation_truths=validation_truths[:,:,0])
-	
-	elif model_type == 'TO':
-		history = train_model(model, training_data, training_truths[:,:,1], 32, 30, validation=True, validation_data=validation_data, validation_truths=validation_truths[:,:,1])
-	
-
+	history = train_model(model, X_train, y_train, 32, nepochs=20, validation=True, validation_data=X_test, validation_truths=y_test)
 
 	# Save the model
-	save_dir = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
-	save_model(model, save_dir, model_type)
+	name = 'foot_events.h5'
+	save_model(model, models_folder, name)
 
-	plot_history(history, model_type, save_dir)
+	plot_history(history, name, models_folder)
 
-	likelihood = model.predict(validation_data)
+	likelihood = model.predict(X_test)
 
-	plt.plot(likelihood[0][0], label='No event probability')
-	plt.plot(likelihood[0][1], label='Foot strike probability')
-	plt.plot(likelihood[0][2], label='Foot off probability')
-	plt.plot(y_validation[0][0], label='No event true')
-	plt.plot(y_validation[0][1], label='Foot strike true')
-	plt.plot(y_validation[0][2], label='Foot off true')
+	plt.plot(likelihood[0,:,0], label='No event probability')
+	plt.plot(likelihood[0,:,1], label='Foot strike probability')
+	plt.plot(likelihood[0,:,2], label='Foot off probability')
+	plt.plot(y_test[0,:,0], label='No event true')
+	plt.plot(y_test[0,:,1], label='Foot strike true')
+	plt.plot(y_test[0,:,2], label='Foot off true')
 	plt.xlabel('time (ms)')
 	plt.ylabel('probability (unitless)')
+	plt.legend()
 	plt.show()
 
-	plt.plot(likelihood[-1][0], label='No event probability')
-	plt.plot(likelihood[-1][1], label='Foot strike probability')
-	plt.plot(likelihood[-1][2], label='Foot off probability')
-	plt.plot(y_validation[-1][0], label='No event true')
-	plt.plot(y_validation[-1][1], label='Foot strike true')
-	plt.plot(y_validation[-1][2], label='Foot off true')
+	plt.plot(likelihood[-1,:,0], label='No event probability')
+	plt.plot(likelihood[-1,:,1], label='Foot strike probability')
+	plt.plot(likelihood[-1,:,2], label='Foot off probability')
+	plt.plot(y_test[-1,:,0], label='No event true')
+	plt.plot(y_test[-1,:,1], label='Foot strike true')
+	plt.plot(y_test[-1,:,2], label='Foot off true')
+	plt.xlabel('time (ms)')
+	plt.ylabel('probability (unitless)')
+	plt.legend()
 	plt.show()
-
-	a = 1
