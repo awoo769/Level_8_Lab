@@ -40,11 +40,13 @@ if __name__ == '__main__':
 
 	# Load datasets and true outputs
 	X_test = np.load(file=data_folder + "X_test.npy", allow_pickle=True)
-	y_test = np.load(file=data_folder + "y_test", allow_pickle=True)
+	y_test = np.load(file=data_folder + "y_test.npy", allow_pickle=True)
 	weights = np.load(file=models_folder + "weights.npy", allow_pickle=True)
 
 	# Load model
 	model = keras.models.load_model(models_folder + 'foot_events.h5', custom_objects={'loss': weighted_categorical_crossentropy(weights)})
-	likelihood = model.predict(y_test)
+	likelihood = model.predict(X_test)
+
+	sdist = eval_prediction(likelihood, y_test, 'test', plot=False)
 
 	a = 1
