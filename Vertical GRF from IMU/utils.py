@@ -129,13 +129,13 @@ def plot_history(history, name: str = None, save_dir: str = None):
 	plt.savefig(save_dir + name + '_accuracy.png')
 
 # Detect peaks
-def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
+def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 	"""
 	This function returns the most likely foot strike and foot off event indices, as detected
 	by the model and contrained by this function.
 	
-	IC and TO event of the same foot are speparated by at least 35 ms and at most 200 ms
-	TO and IC event of opposing feet are separated by at least 160 ms and at most 350 ms
+	IC and TO event of the same foot are speparated by at least 160 ms and at most 350 ms
+	TO and IC event of opposing feet are separated by at least 35 ms and at most 200 ms
 
 	The peaks must have a likelhood of above cutoff
 
@@ -151,11 +151,11 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
 	FS_initial = FS_initial[(likelihood[:,0])[FS_initial] > cutoff]
 	FO_initial = FO_initial[(likelihood[:,1])[FO_initial] > cutoff]
 
-	# Run through each of the FS and FO arrays to see if there are any peaks that should be combined (less than 35 ms apart)
+	# Run through each of the FS and FO arrays to see if there are any peaks that should be combined (less than 50 ms apart)
 	FS_initial2 = []
 	do_not_append = []
 	for i in range(1, len(FS_initial)):
-		if FS_initial[i] - FS_initial[i-1] < 35:
+		if FS_initial[i] - FS_initial[i-1] < 50: # If they are very close
 			# Remove the previous first event and replace with one 3/4s between the two same events
 			temp = int((FS_initial[i] - FS_initial[i-1]) * 3/4) + FS_initial[i-1]
 			FS_initial2.append(temp)
@@ -175,7 +175,7 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
 	FO_initial2 = []
 	do_not_append = []
 	for i in range(1, len(FO_initial)):
-		if FO_initial[i] - FO_initial[i-1] < 35:
+		if FO_initial[i] - FO_initial[i-1] < 50: # If they are very close
 			# Remove the previous first event and replace with one 3/4s between the two same events
 			temp = int((FO_initial[i] - FO_initial[i-1]) * 3/4) + FO_initial[i-1]
 			FO_initial2.append(temp)
@@ -204,36 +204,125 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
 		smallest = FO_initial
 		longest = FS_initial
 	
-	difference = abs(len(FS_initial) - len(FO_initial))
+	difference = len(FS_initial) - len(FO_initial)
+	# If difference < 0, more FO events predicted.
+	# If difference > 0, more FS events predicted.
 
 	FO = 0
 	FS = 0
 
 	# Check which comes first
 	if FS_initial[0] < FO_initial[0]:
-		first = FS_initial
-		second = FO_initial
 		FS = 1
 	
 	else:
-		first = FO_initial
-		second = FS_initial
 		FO = 1
 
-	# See if there are any FO's which have another FO before the next FS. If there is, take the second FO
-	FO_diff = []
-	for i in range(len(FO_initial)):
-		FO_diff.append(FS_initial - FO_initial[i])
+	if FO == 1:
+		FS_temp = []
+		for i in range(len(FO_initial)):
+			try:
+				FS_for_FO = FS_initial[np.logical_and(FS_initial>FO_initial[i], FS_initial<FO_initial[i+1])]
 
-	# If FO = 1, the 1st row of FO_diff should contain 0 negatives, 2nd 1, 3rd 2 and etc...
-	if FO != 1:
-		pass # TODO
-	else:
+				if len(FS_for_FO) > 0:
+					# Should be taking the first value
+					condition_met = 0
+					j = 0
+					while condition_met == 0:
+						if (FS_for_FO[j] - FO_initial[i] < 200) and (FS_for_FO[j] - FO_initial[i] > 35):
+							FS_temp.append(FS_for_FO[j])
+							condition_met = 1
+						j += 1
+				else:
+					# Remove the FO value (there is no FS for it and it is not the last one) - shouldn't be here
+					FO_initial[i] = -1
+				
+			except IndexError:
+				FS_for_FO = FS_initial[FS_initial>FO_initial[i]]
+
+				if len(FS_for_FO) > 0:
+				# Should be taking the first value
+					condition_met = 0
+					j = 0
+					while condition_met == 0:
+						if (FS_for_FO[j] - FO_initial[i] < 200) and (FS_for_FO[j] - FO_initial[i] > 35):
+							FS_temp.append(FS_for_FO[j])
+							condition_met = 1
+						j += 1
+		FO_temp = FO_initial[FO_initial != -1]
+	
+	elif FS == 1:
+		FO_temp = []
+		for i in range(len(FS_initial)):
+			try:
+				FO_for_FS = FO_initial[np.logical_and(FO_initial>FS_initial[i], FO_initial<FS_initial[i+1])]
+
+				if len(FO_for_FS) > 0:
+					# Should be taking the first value
+					condition_met = 0
+					j = 0
+					while condition_met == 0:
+						if (FO_for_FS[j] - FS_initial[i] < 350) and (FO_for_FS[j] - FS_initial[i] > 160):
+							FO_temp.append(FO_for_FS[j])
+							condition_met = 1
+						j += 1
+				else:
+					# Remove the FS value (there is no FO for it and it is not the last one) - shouldn't be here
+					FS_initial[i] = -1
+				
+			except IndexError:
+				FS_for_FO = FS_initial[FS_initial>FO_initial[i]]
+
+				if len(FO_for_FS) > 0:
+					# Should be taking the first value
+					condition_met = 0
+					j = 0
+					while condition_met == 0:
+						if (FO_for_FS[j] - FS_initial[i] < 350) and (FO_for_FS[j] - FS_initial[i] > 160):
+							FO_temp.append(FO_for_FS[j])
+							condition_met = 1
+						j += 1
+		FS_temp = FS_initial[FS_initial != -1]
+
+	difference = len(FS_temp) - len(FO_temp)
+	# If difference < 0, more FO events predicted.
+	# If difference > 0, more FS events predicted.
+
+	if difference > 0: # There are more FS events than FO events, will have started with FS
+		# See if there are any FS's which have another FS before the next FO. If there is, take the first FS
+		FS_diff = []
+		for i in range(len(FS_initial)):
+			FS_diff.append(FO_initial - FS_initial[i])
+
+			for i in range(len(FS_diff)):
+				neg_count = len(list(filter(lambda x: (x < 0), FS_diff[i].tolist())))
+			if neg_count != i:
+				# Then the value of the current FS is wrong
+				FS_initial = np.delete(FS_initial, i)
+
+		# If FO = 1, the 1st row of FO_diff should contain 0 negatives, 2nd 1, 3rd 2 and etc...
+	elif difference < 0: # There are more FO events than FS events, will have started with FO
+		# See if there are any FO's which have another FO before the next FS. If there is, take the second FO
+		FO_diff = []
+		for i in range(len(FO_initial)):
+			FO_diff.append(FS_initial - FO_initial[i])
+
 		for i in range(len(FO_diff)):
 			neg_count = len(list(filter(lambda x: (x < 0), FO_diff[i].tolist())))
 			if neg_count != i:
 				# Then the value of FO previous is wrong
 				FO_initial = np.delete(FO_initial, i-1)
+
+	# Check which comes first
+	if FS_temp[0] < FO_temp[0]:
+		first = FS_temp
+		second = FO_temp
+		FS = 1
+	
+	else:
+		first = FO_temp
+		second = FS_temp
+		FO = 1
 
 	for i in range(length):
 		# Each foot strike should be followed by a foot off.
@@ -247,8 +336,24 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
 		else:
 			pass
 	
+		# Check that FO and FS pass the requirements
+		if difference == 0 and FO == 1:
+			for i in range(len(FO_temp)):
+				# Different feet
+				assert(FS_temp[i] - FO_temp[i] > 35)
+				assert(FS_temp[i] - FO_temp[i] < 200)
+		
+		if difference == 0 and FS == 1:
+			for i in range(len(FS_temp)):
+				# Same feet
+				assert(FO_temp[i] - FS_temp[i] > 160)
+				assert(FO_temp[i] - FS_temp[i] < 350)
+
+			
+
+
 	# Make sure that there aren't any other events missed
-	if difference > 0:
+	'''if difference > 0: #TODO
 		if smallest[i] > longest[i+1]:
 			if longest[i+1] - longest[i] < 35:
 				temp = int((longest[i+1] - longest[i]) * 3/4) + longest[i]
@@ -260,6 +365,7 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.2):
 
 
 					a = 1
+	'''
 	return out
 
 # Compare predicted to true
@@ -300,11 +406,18 @@ def eval_prediction(likelihood, true, patient, plot = True):
 	n_samples = likelihood.shape[0]
 
 	for i in range(n_samples):
-		if i == 174:
-			stop = True
-		est_events = peak_det(likelihood[i,:,1:], 0.2) # Foot strike and foot off
+
+		est_events = peak_det(likelihood[i,:,1:], 0.15) # Foot strike and foot off
 
 		sdist.append(peak_cmp(true[i,:,1:], est_events))
+		'''
+		if sdist[-1] == -1:
+			stop = True
+
+			plt.plot(likelihood[i,:,1:])
+			plt.plot(true[i])
+			plt.show()
+		'''
 
 		if plot:
 			plt.plot(est_events) # continous likelihood process
@@ -313,3 +426,88 @@ def eval_prediction(likelihood, true, patient, plot = True):
 			plt.show()
 
 	return sdist
+
+
+def show_results(sdist: list):
+	'''
+	This function uses the output of eval_predictions and presents the results in a statistical manner
+
+	'''
+
+	# Number of samples which failed
+	fail = len(np.where(np.array(sdist) == -1)[0])
+	print('Number of failed samples = {}/{}'.format(fail,len(sdist)))
+
+	# Remove the failed samples from the list
+	to_remove = np.where(np.array(sdist) == -1)[0]
+	for i in range(fail):
+		del sdist[to_remove[i]-i]
+	
+	# Convert list of tuples to a list containing all FS and one containing all FO
+	sample_FS = []
+	sample_FO = []
+
+	for sample in sdist:
+		sample_FS.append(sample[0])
+		sample_FO.append(sample[1])
+
+	FS = [item for sublist in sample_FS for item in sublist]
+	FO = [item for sublist in sample_FO for item in sublist]
+
+	events = [FS, FO]
+	names = ['Foot Strike', 'Foot Off']
+
+	# Produce boxplots
+	boxplot(events, names, False)
+
+
+def boxplot(events: list, names: list, absolute: str = False):
+
+	if absolute:
+		events[0] = abs(np.array(events[0])).tolist()
+		events[1] = abs(np.array(events[1])).tolist()
+
+	# Create boxplots of differences between real and estimated events
+	_, axs = plt.subplots()
+
+	bp = axs.boxplot(events, labels = names)
+	
+	plt.setp(bp['medians'], color='k')
+
+	axs.set_ylabel('Time difference (ms)')
+	axs.set_xlabel('')
+	axs.set_title('Estimated Gait Events vs True Gait Events')
+	
+	# Add points
+	num_boxes = len(names)
+
+	for i in range(num_boxes):
+		y = events[i]
+		x = np.random.normal(1+i, 0.04, size=len(y))
+		plt.plot(x, y, 'r.', alpha=0.2)
+
+	# Medians
+	FS_median = np.quantile(events[0], 0.5)
+	FO_median = np.quantile(events[1], 0.5)
+
+	# Quantiles
+	FS_UQ = np.quantile(events[0], 0.75)
+	FS_LQ = np.quantile(events[0], 0.25)
+	FO_UQ = np.quantile(events[1], 0.75)
+	FO_LQ = np.quantile(events[1], 0.25)
+
+	# Min and max
+	FS_min = np.quantile(events[0], 0)
+	FS_max = np.quantile(events[0], 1)
+
+	FO_min = np.quantile(events[1], 0)
+	FO_max = np.quantile(events[1], 1)
+
+	# Number of samples
+	FS_nsamples = len(events[0])
+	FO_nsamples = len(events[1])
+
+	plt.text(x=0.65, y=2, s='median = {}\nUQ = {}\nLQ = {}\nmax = {}\nmin = {}\nnsamples = {}'.format(FS_median, FS_UQ, FS_LQ, FS_max, FS_min, FS_nsamples), bbox=dict(edgecolor='k', facecolor='w'))
+	plt.text(x=1.65, y=2, s='median = {}\nUQ = {}\nLQ = {}\nmax = {}\nmin = {}\nnsamples = {}'.format(FO_median, FO_UQ, FO_LQ, FO_max, FO_min, FO_nsamples), bbox=dict(edgecolor='k', facecolor='w'))
+	
+	plt.show()

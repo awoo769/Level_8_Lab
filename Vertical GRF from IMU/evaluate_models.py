@@ -1,4 +1,4 @@
-from utils import weighted_binary_crossentropy, eval_prediction, weighted_categorical_crossentropy
+from utils import eval_prediction, weighted_categorical_crossentropy, show_results
 
 import tensorflow as tf
 from tensorflow import keras
@@ -13,8 +13,6 @@ from matplotlib import pyplot as plt
 # Disables the tensorflow AVX2 warning, doesn't enable AVX2
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-keras.losses.weighted_binary_crossentropy = weighted_binary_crossentropy
 keras.losses.weighted_categorical_crossentropy = weighted_categorical_crossentropy
 
 
@@ -49,4 +47,4 @@ if __name__ == '__main__':
 
 	sdist = eval_prediction(likelihood, y_test, 'test', plot=False)
 
-	a = 1
+	show_results(sdist)
