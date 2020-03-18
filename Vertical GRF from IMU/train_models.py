@@ -35,7 +35,8 @@ if __name__ == '__main__':
 	y_test = np.load(file=data_folder + 'y_test.npy', allow_pickle=True)
 
 	# Weighting for each event
-	weights = np.array([5, 350, 350])
+	# [no event, FS, FO]
+	weights = np.array([10, 350, 300])
 
 	if not os.path.exists('{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2])):
 		os.makedirs('{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2]))
@@ -59,7 +60,7 @@ if __name__ == '__main__':
 
 	#tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 
-	history = train_model(model, X_train, y_train, 32, nepochs=20, validation=True, validation_data=X_test, validation_truths=y_test)
+	history = train_model(model, X_train, y_train, 32, nepochs=40, validation=True, validation_data=X_test, validation_truths=y_test)
 
 	# Save the model
 	name = 'foot_events_{}_{}_{}'.format(weights[0], weights[1], weights[2])

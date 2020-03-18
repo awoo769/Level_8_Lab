@@ -16,18 +16,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 keras.losses.weighted_categorical_crossentropy = weighted_categorical_crossentropy
 
 
-def get_models(directory: str = None):
-	if not os.path.exists(directory + 'models\\HS.h5'):
-		print('Models do not exist in selected directory')
-
-		return -1
-	else:
-		model_HS = keras.models.load_model(directory + 'models\\HS.h5')#, custom_objects={'weighted_binary_crossentropy': weighted_binary_crossentropy})
-		model_TO = keras.models.load_model(directory + 'models\\TO.h5')#, custom_objects={'weighted_binary_crossentropy': weighted_binary_crossentropy})
-
-		return model_HS, model_TO
-
-
 if __name__ == '__main__':
 
 	# data folder
@@ -36,7 +24,7 @@ if __name__ == '__main__':
 	# models folder
 	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
 
-	weights = np.array([10, 350, 350])
+	weights = np.array([10, 350, 300])
 
 	models_folder = '{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2])
 

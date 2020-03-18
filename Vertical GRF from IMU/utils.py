@@ -19,7 +19,6 @@ def construct_model(units: int = 32, lstm_layers: int = 2, input_shape: int = (6
 	
 	for _ in range(lstm_layers-1):
 		model.add(keras.layers.Bidirectional(keras.layers.LSTM(units, return_sequences=True)))
-		#model.add(keras.layers.LSTM(units, return_sequences=True))
 
 	loss = weighted_categorical_crossentropy(weights)
 	
@@ -28,15 +27,6 @@ def construct_model(units: int = 32, lstm_layers: int = 2, input_shape: int = (6
 
 	return model
 
-
-# Create loss function
-def weighted_binary_crossentropy(y_true, y_pred):
-	# Play around with this - see if it is neccesary to have both HS and TO
-
-	# adding 0.01 so nothing is multiplied by 0
-	l = keras.backend.mean(keras.backend.binary_crossentropy(y_pred[:,0], y_true[:,0]) * (y_true[:,0] + 0.01), axis=-1)
-	
-	return l
 
 
 def weighted_categorical_crossentropy(weights):
@@ -150,17 +140,79 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 	FS_initial = FS_initial[(likelihood[:,0])[FS_initial] > cutoff]
 	FO_initial = FO_initial[(likelihood[:,1])[FO_initial] > cutoff]
 
-	# Run through each of the FS and FO arrays to see if there are any peaks that should be combined (less than 50 ms apart)
+
+	# Case where there is a FS at the very end of the recording with nothing before it.
+	if len(FO_initial) == 0 and len(FS_initial == 1):
+		# If the foot strike occurs within the final 350 ms, then accept the foot strike
+		if FS_initial[0] > len(likelihood) - 350:
+			out[0,FS_initial[0]] = 1
+
+			return out
+		
+		else:
+			return [-1, -1]
+
+	if len(FS_initial) == 0 and len(FO_initial == 1):
+		# If the foot off occurs within the first 200 ms, then accept the foot off
+		if FS_initial[0] < 200:
+			out[1,FO_initial[0]] = 1
+
+			return out
+		
+		else:
+			return [-1, -1]
+
+
+	# There has been a mistake
+	if len(FO_initial) > 1 and len(FS_initial) == 0:
+		return [-1, -1]
+	
+	if len(FS_initial) > 1 and len(FO_initial) == 0:
+		return [-1, -1]
+
+	# Run through each of the FS and FO arrays to see if there are any peaks that should be combined (less than 35 ms apart)
 	FS_initial2 = []
 	do_not_append = []
 	for i in range(1, len(FS_initial)):
-		if FS_initial[i] - FS_initial[i-1] < 50: # If they are very close
-			# Remove the previous first event and replace with one 3/4s between the two same events
-			temp = int((FS_initial[i] - FS_initial[i-1]) * 3/4) + FS_initial[i-1]
+		if FS_initial[i] - FS_initial[i-1] < 35: # If they are very close
+
+			FS_temp_min = FS_initial[i-1] + argrelextrema(likelihood[FS_initial[i-1]:FS_initial[i],0]+1, np.less)[0]
+			if len(FS_temp_min) > 0:
+				if FS_temp_min[0] > 0.1:
+
+					# Remove the previous first event and replace with one 3/4s between the two same events (towards the greatest point)
+					max_point = max([FS_initial[i], FS_initial[i-1]])
+
+					if max_point == FS_initial[i]: # If it is the second one
+						temp = int((FS_initial[i] - FS_initial[i-1]) * 3/4) + FS_initial[i-1]
+					else:
+						temp = int((FS_initial[i] - FS_initial[i-1]) * 1/4) + FS_initial[i-1]
+					
+					# Add both to the do not append list
+					do_not_append.append(FS_initial[i])
+					do_not_append.append(FS_initial[i-1])
+
+				else:
+					temp = max([FS_initial[i], FS_initial[i-1]])
+
+					if temp == FS_initial[i]: # If it is the second one
+						# Add the previous point to the do not append list
+						do_not_append.append(FS_initial[i-1])
+					else:
+						# Add current point to the do not append list
+						do_not_append.append(FS_initial[i])
+			else:
+				temp = max([FS_initial[i], FS_initial[i-1]])
+
+				if temp == FS_initial[i]: # If it is the second one
+					# Add the previous point to the do not append list
+					do_not_append.append(FS_initial[i-1])
+				else:
+					# Add current point to the do not append list
+					do_not_append.append(FS_initial[i])
+
 			FS_initial2.append(temp)
-			# Add both to the do not append list
-			do_not_append.append(FS_initial[i])
-			do_not_append.append(FS_initial[i-1])
+
 
 		else:
 			if FS_initial[i-1] not in do_not_append:
@@ -174,13 +226,43 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 	FO_initial2 = []
 	do_not_append = []
 	for i in range(1, len(FO_initial)):
-		if FO_initial[i] - FO_initial[i-1] < 50: # If they are very close
-			# Remove the previous first event and replace with one 3/4s between the two same events
-			temp = int((FO_initial[i] - FO_initial[i-1]) * 3/4) + FO_initial[i-1]
+		if FO_initial[i] - FO_initial[i-1] < 35: # If they are very close
+
+			FO_temp_min = FO_initial[i-1] + argrelextrema(likelihood[FO_initial[i-1]:FO_initial[i]+1,1], np.less)[0]
+			if len(FO_temp_min) > 0:
+				if FO_temp_min[0] > 0.1:
+
+					# Remove the previous first event and replace with one 3/4s between the two same events (towards the greatest point)
+					max_point = max([FO_initial[i], FO_initial[i-1]])
+
+					if max_point == FO_initial[i]: # If it is the current point
+						temp = int((FO_initial[i] - FO_initial[i-1]) * 3/4) + FO_initial[i-1]
+					else:
+						temp = int((FO_initial[i] - FO_initial[i-1]) * 1/4) + FO_initial[i-1]
+					
+					# Add both to the do not append list
+					do_not_append.append(FO_initial[i])
+					do_not_append.append(FO_initial[i-1])
+				else:
+					temp = max([FO_initial[i], FO_initial[i-1]]) #fix TODO regarding do_not_append
+
+					if temp == FO_initial[i]: # If it is the second one
+						# Add the previous point to the do not append list
+						do_not_append.append(FO_initial[i-1])
+					else:
+						# Add current point to the do not append list
+						do_not_append.append(FO_initial[i])
+			else:
+				temp = max([FO_initial[i], FO_initial[i-1]]) #fix TODO regarding do_not_append
+
+				if temp == FO_initial[i]: # If it is the second one
+					# Add the previous point to the do not append list
+					do_not_append.append(FO_initial[i-1])
+				else:
+					# Add current point to the do not append list
+					do_not_append.append(FO_initial[i])
+
 			FO_initial2.append(temp)
-			# Add both to the do not append list
-			do_not_append.append(FO_initial[i])
-			do_not_append.append(FO_initial[i-1])
 
 		else:
 			if FO_initial[i-1] not in do_not_append:
@@ -425,6 +507,10 @@ def peak_cmp(true, predicted):
 	This function returns the difference between a true event and a predicted event
 
 	'''
+	# If an error occured
+	if type(predicted) == list:
+		if predicted == [-1,-1]:
+			return -1
 
 	FS_true = np.where(true[:,0] == 1)[0]
 	FO_true = np.where(true[:,1] == 1)[0]
