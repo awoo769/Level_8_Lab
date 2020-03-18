@@ -316,3 +316,16 @@ if __name__ == '__main__':
 	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\dataset.npy", dataset)
 	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\HS_TO.npy", HS_TO)
 	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\subject_information.npy", subject_information)
+
+	# Train on 80 % of data, test on 20 %
+	# 3 classes. 0 = no event, 1 = foot strike, 2 = foot off
+	y = HS_TO[:,:,0] * 1 + HS_TO[:,:,1] * 2
+	y_true = keras.utils.to_categorical(y)
+
+	X_train, X_test, y_train, y_test = train_test_split(dataset, y_true, test_size=0.2)
+
+	# Save datasets
+	np.save(models_folder + 'X_train.npy', X_train)
+	np.save(models_folder + 'y_train.npy', y_train)
+	np.save(models_folder + 'X_test.npy', X_test)
+	np.save(models_folder + 'y_test.npy', y_test)
