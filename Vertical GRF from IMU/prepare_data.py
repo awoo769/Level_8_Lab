@@ -7,6 +7,10 @@ import re
 from matplotlib import pylab as plt
 import openpyxl
 from pathlib import Path
+
+from tensorflow import keras
+from sklearn.model_selection import train_test_split
+
 '''
 This script prepares acceleration data from ankle worn IMU's to find HS and TO events using a machine
 learning process.
@@ -313,9 +317,11 @@ if __name__ == '__main__':
 	# 0 if no event, 1 if event. The first column is HS and the second is TO
 	HS_TO = np.array(HS_TO_init)
 
-	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\dataset.npy", dataset)
-	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\HS_TO.npy", HS_TO)
-	np.save("C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\subject_information.npy", subject_information)
+	dataset_folder = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\"
+
+	np.save(dataset_folder + "dataset.npy", dataset)
+	np.save(dataset_folder + "HS_TO.npy", HS_TO)
+	np.save(dataset_folder + "subject_information.npy", subject_information)
 
 	# Train on 80 % of data, test on 20 %
 	# 3 classes. 0 = no event, 1 = foot strike, 2 = foot off
@@ -325,7 +331,7 @@ if __name__ == '__main__':
 	X_train, X_test, y_train, y_test = train_test_split(dataset, y_true, test_size=0.2)
 
 	# Save datasets
-	np.save(models_folder + 'X_train.npy', X_train)
-	np.save(models_folder + 'y_train.npy', y_train)
-	np.save(models_folder + 'X_test.npy', X_test)
-	np.save(models_folder + 'y_test.npy', y_test)
+	np.save(dataset_folder + "X_train.npy", X_train)
+	np.save(dataset_folder + "y_train.npy", y_train)
+	np.save(dataset_folder + "X_test.npy", X_test)
+	np.save(dataset_folder + "y_test.npy", y_test)

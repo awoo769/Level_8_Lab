@@ -140,12 +140,15 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 	FS_initial = FS_initial[(likelihood[:,0])[FS_initial] > cutoff]
 	FO_initial = FO_initial[(likelihood[:,1])[FO_initial] > cutoff]
 
+	# If there is no detected events
+	if len(FO_initial) == 0 and len(FS_initial) == 0:
+		return out
 
 	# Case where there is a FS at the very end of the recording with nothing before it.
 	if len(FO_initial) == 0 and len(FS_initial == 1):
 		# If the foot strike occurs within the final 350 ms, then accept the foot strike
 		if FS_initial[0] > len(likelihood) - 350:
-			out[0,FS_initial[0]] = 1
+			out[FS_initial[0],0] = 1
 
 			return out
 		
@@ -154,8 +157,8 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 
 	if len(FS_initial) == 0 and len(FO_initial == 1):
 		# If the foot off occurs within the first 200 ms, then accept the foot off
-		if FS_initial[0] < 200:
-			out[1,FO_initial[0]] = 1
+		if FO_initial[0] < 200:
+			out[FO_initial[0],1] = 1
 
 			return out
 		
@@ -456,48 +459,9 @@ def peak_det(likelihood: np.ndarray, cutoff: int = 0.15):
 				# Then the value of FO previous is wrong
 				FO_temp = np.delete(FO_temp, i-1)
 
-	if len(FS_temp) <= len(FO_temp):
-		length = len(FS_temp)
-	else:
-		length = len(FO_temp)
-
-	# Check which comes first
-	if FS_temp[0] < FO_temp[0]:
-		first = FS_temp
-		second = FO_temp
-		FS = 1
-		FO = 0
-	
-	else:
-		first = FO_temp
-		second = FS_temp
-		FO = 1
-		FS = 0
-
-	for i in range(length):
-		# Each foot strike should be followed by a foot off.
-		if first[i] < second[i]:
-			if FS:
-				out[first[i],0] = 1 # FS occurs here
-				out[second[i],1] = 1 # FO occurs here
-			elif FO:
-				out[first[i],1] = 1 # FO orrurs here
-				out[second[i],0] = 1 # FS orrurs here
-		else:
-			pass
-	
-		# Check that FO and FS pass the requirements
-		if difference == 0 and FO == 1:
-			for i in range(len(FO_temp)):
-				# Different feet
-				assert(FS_temp[i] - FO_temp[i] > 35)
-				assert(FS_temp[i] - FO_temp[i] < 200)
-		
-		if difference == 0 and FS == 1:
-			for i in range(len(FS_temp)):
-				# Same feet
-				assert(FO_temp[i] - FS_temp[i] > 160)
-				assert(FO_temp[i] - FS_temp[i] < 350)
+	# Add FS and FO locations to the output array
+	out[FS_temp,0] = 1
+	out[FO_temp,1] = 1
 
 	return out
 
@@ -543,6 +507,9 @@ def eval_prediction(likelihood, true, patient, plot = True):
 	n_samples = likelihood.shape[0]
 
 	for i in range(n_samples):
+
+		if i == 17:
+			stop = 1
 
 		est_events = peak_det(likelihood[i,:,1:], 0.15) # Foot strike and foot off
 
