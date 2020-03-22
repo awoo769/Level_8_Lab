@@ -310,7 +310,7 @@ if __name__ == '__main__':
 	subject_information = np.array(subject_information)
 
 	# Length of each sample = 600 ms
-	length = 650
+	length = 636
 
 	for f in files:
 		print('Running file: ' + str(f))
