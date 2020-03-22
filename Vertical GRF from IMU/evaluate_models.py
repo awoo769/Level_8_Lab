@@ -24,7 +24,7 @@ if __name__ == '__main__':
 	# models folder
 	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
 
-	weights = np.array([10, 350, 300])
+	weights = np.array([10, 350, 350])
 
 	models_folder = '{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2])
 

@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
 	# Weighting for each event
 	# [no event, FS, FO]
-	weights = np.array([10, 350, 300])
+	weights = np.array([10, 350, 350])
 
 	if not os.path.exists('{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2])):
 		os.makedirs('{}weights_{}_{}_{}\\'.format(models_folder, weights[0], weights[1], weights[2]))
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 	model = construct_model(input_shape=X_train.shape[1:], output_dim=3, weights=weights)
 
 	#tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
-	nepochs = 100
+	nepochs = 15
 
 	history = train_model(model, X_train, y_train, 32, nepochs=nepochs, validation=True, validation_data=X_test, validation_truths=y_test)
 
