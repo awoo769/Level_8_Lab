@@ -3,9 +3,10 @@
 *.code-workspace
 
 *.vscode
-
+*.h5
 Python_OpenSim/
 Gait2354_Simbody/
+Vertical_GRF_from_IMU/data/
 
 # Byte-compiled / optimized / DLL files
 
