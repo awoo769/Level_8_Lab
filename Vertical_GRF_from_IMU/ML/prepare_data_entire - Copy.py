@@ -98,7 +98,7 @@ def read_csv(filename: str):
 	return np.array(data)
 
 
-def prepare_data(data: np.ndarray, acc_dataset: list, HS_TO: list, force_dataset: list, filepath: str):
+def prepare_data(data: np.ndarray, acc_dataset: list, HS_TO: list, force_dataset: list, dataset_type: str):
 	'''
 	This function creates the dataset of events in which features will be extracted from
 
@@ -131,49 +131,80 @@ def prepare_data(data: np.ndarray, acc_dataset: list, HS_TO: list, force_dataset
 	for i in range(len(a_r)):
 		new_a_r[i,:] = signal.filtfilt(b_a, a_a, a_r[i,:])
 
-	# Get force plate data for comparison
-	F = (data[:,1:3+1].T).astype(np.float) #[Fx, Fy, Fz]; Fz = vertical
+	if dataset_type == 'training' or dataset_type == 'testing':
+		# Get force plate data for comparison
+		F = (data[:,1:3+1].T).astype(np.float) #[Fx, Fy, Fz]; Fz = vertical
 
-	# Rotate 180 deg around y axis (inverse Fx and Fz)
-	F[0] = -F[0] # Fx
-	F[2] = -F[2] # Fz
+		# Rotate 180 deg around y axis (inverse Fx and Fz)
+		F[0] = -F[0] # Fx
+		F[2] = -F[2] # Fz
 
-	''' Filter force plate data at 60 Hz '''
-	analog_frequency = 1000
-	cut_off = 60 # Derie (2017), Robberechts et al (2019)
-	order = 2 # Weyand (2017), Robberechts et al (2019)
-	b_f, a_f = signal.butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
+		''' Filter force plate data at 60 Hz '''
+		analog_frequency = 1000
+		cut_off = 60 # Derie (2017), Robberechts et al (2019)
+		order = 2 # Weyand (2017), Robberechts et al (2019)
+		b_f, a_f = signal.butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
 
-	new_F = np.zeros(np.shape(F))
+		new_F = np.zeros(np.shape(F))
 
-	for i in range(len(F)):
-		new_F[i,:] = signal.filtfilt(b_f, a_f, F[i,:])
+		for i in range(len(F)):
+			new_F[i,:] = signal.filtfilt(b_f, a_f, F[i,:])
 
-	''' Rezero '''
-	threshold = 20 # 20 N
-	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
+		''' Rezero '''
+		threshold = 20 # 20 N
+		filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
+		
+		for i in range(len(F)): # Fx, Fy, Fz
+			new_F[i,:] = filter_plate * new_F[i,:]
+		
+		''' Ground truth event timings '''
+		# Get the points where there is force applied to the force plate (stance phase). Beginning = heel strike, end = toe off
+		heel_strike = []
+		toe_off = []
+
+		for i in range(1, len(new_F[2])-1):
+			if (new_F[2])[i-1] == 0 and (new_F[2])[i] != 0:
+				heel_strike.append(i-1)
+			
+			if (new_F[2])[i+1] == 0 and (new_F[2])[i] != 0:
+				toe_off.append(i+1)
 	
-	for i in range(len(F)): # Fx, Fy, Fz
-		new_F[i,:] = filter_plate * new_F[i,:]
+		# Check that the heel strike and toe off events are in the correct order (HS then TO)
+		while heel_strike[0] > toe_off[0]:
+			# Remove first toe_off event
+			toe_off = toe_off[1:]
+		
+		while len(heel_strike) > len(toe_off):
+			# Remove last heel strike event
+			heel_strike = heel_strike[:-1]
+		
+		assert len(heel_strike) == len(toe_off)
 
-	# Write IMU motion file (input file)
-	headers = ['time', 'L_accel.x', 'L_accel.y', 'L_accel.z', 'R_accel.x', 'R_accel.y', 'R_accel.z']
+		# Check that the order of events is HS, TO, HS, TO, ... etc
+		TO_prev = 0
+		for i in range(len(heel_strike)):
+			# The current HS should occur after the previous TO
+			assert heel_strike[i] > TO_prev
+			
+			# The current TO should occur after the last HS
+			assert toe_off[i] > heel_strike[i]
 
-	data = np.vstack((time, new_a_l, new_a_r))
+			TO_prev = toe_off[i]
 
-	new_path = filepath.rsplit("\\",1)[-1]
-	new_path = new_path.rsplit(".",1)[0]
+		# no event = 0, FS = 1, FO = 2
+		HS_TO_temp = np.zeros(len(new_a_l[0]))
 
-	name = filepath.rsplit("\\",1)[0] + '\\ProcessedIMU' + new_path + ".mot"
+		HS_TO_temp[heel_strike] = 1
+		HS_TO_temp[toe_off] = 2
 
-	write_mot(grf_complete=data, file_path=name, headers=headers, unit="mm/s^2")
-	
-	# Write Force motion file (output file)
-	headers = ['time', 'Force.Fz1']
-	data = np.vstack((time, new_F[-1]))
+		HS_TO.append(HS_TO_temp)
 
-	name = filepath.rsplit("\\",1)[0] + '\\ProcessedvGRF' + new_path + ".mot"
-	write_mot(grf_complete=data, file_path=name, headers=headers, unit="F")
+		acc_dataset_temp = np.vstack((new_a_l, new_a_r)).tolist()
+
+		acc_dataset.append(acc_dataset_temp)
+		force_dataset.append(new_F.tolist())
+
+		return acc_dataset, HS_TO, force_dataset
 
 if __name__ == '__main__':
 	''' Read in file '''
@@ -182,6 +213,7 @@ if __name__ == '__main__':
 	os.chdir(path)
 	files = glob.glob('*.{}'.format(ext))
 
+	dataset_type = ['training', 'testing', 'validating']
 	acc_dataset = []
 	force_dataset = []
 	HS_TO = []
@@ -206,5 +238,66 @@ if __name__ == '__main__':
 	for f in files:
 		print('Running file: ' + str(f))
 		data = read_csv(f)
-		prepare_data(data, acc_dataset, HS_TO, force_dataset, filepath = path + f)
+		prepare_data(data, acc_dataset, HS_TO, force_dataset, dataset_type[0])
 	
+
+	# All trials need to have the same length, so find the minimum length and use that.
+	min_length = np.Inf
+
+	for trial in HS_TO:
+		length = len(trial)
+		if length < min_length:
+			min_length = length
+
+
+	# dataset will have n number of events. Each event has the structure:
+	# left:
+	#	ax
+	#	ay
+	#	az
+	# right:
+	#	ax
+	#	ay
+	#	az
+
+	# Shape of each event in the dataset
+	# (636, 6) = (636, [ax_l, ay_l, az_l, ax_r, ay_r, az_r], 636)
+	# 636 is set in the first event as 200 below HS and 200 above TO.
+
+	# Shape of the entire dataset
+	# (n, 636, 6)
+
+	for i in range(len(HS_TO)):
+		HS_TO[i] = (HS_TO[i])[:min_length]
+
+		for j in range(len(force_dataset[i])):
+			force_dataset[i][j] = (force_dataset[i][j])[:min_length]
+		
+		for j in range(len(acc_dataset[i])):
+			acc_dataset[i][j] = (acc_dataset[i][j])[:min_length]
+
+	# Convert to numpy arrays
+	HS_TO = np.array(HS_TO)
+	force_dataset = np.array(force_dataset)
+	acc_dataset = np.array(acc_dataset)
+
+	# Transform to have in the shape (nsamples, length, features)
+	HS_TO = np.swapaxes(HS_TO, 1, -1)
+	force_dataset = np.swapaxes(force_dataset, 1, -1)
+	acc_dataset = np.swapaxes(acc_dataset, 1, -1)
+
+	dataset_folder = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical_GRF_from_IMU\\data\\"
+
+	X_all = acc_dataset
+	y_true_events = keras.utils.to_categorical(HS_TO)
+	y_true_grf = force_dataset
+
+	# Save datasets as h5
+	hf = h5py.File(dataset_folder + 'dataset.h5', 'w')
+
+	hf.create_dataset('X_all', data=acc_dataset, compression="gzip")
+	hf.create_dataset('y_all_events', data=y_true_events, compression="gzip")
+	hf.create_dataset('y_true_grf', data=y_true_grf, compression="gzip")
+
+
+	np.save(dataset_folder + "subject_information.npy", subject_information)
