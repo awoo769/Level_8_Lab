@@ -13,7 +13,7 @@ Auckland Bioengineering Institution
 '''
 
 ''' Read in file '''
-data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\0126run2.csv'
+data_directory = 'C:\\Users\\alexw\\Desktop\\RunningData\\workingdir\\data\\Raw data\\0108run2.csv'
 
 with open(data_directory, 'r') as csvfile:
 	reader = csv.reader(csvfile, delimiter=',')

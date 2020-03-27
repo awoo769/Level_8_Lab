@@ -9,6 +9,7 @@ import numpy as np
 from matplotlib import pyplot
 import sys
 import h5py
+import pickle
 
 from matplotlib import pyplot as plt
 
@@ -23,11 +24,33 @@ from utils import construct_model, train_model, save_model, plot_history
 if __name__ == '__main__':
 
 	# data folder
-	data_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\'
+	data_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical_GRF_from_IMU\\data\\'
 
 	# models folder
-	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\models\\'
+	models_folder = 'C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical_GRF_from_IMU\\models\\'
 
+	with open(data_folder + "dataset.pkl", "rb") as f:
+		dataset = pickle.load(f)
+
+
+	X_train = np.array([])
+	y_train = np.array([])
+
+	counter = 0
+	ntrials = len(dataset)
+
+	for keys in dataset.keys():
+		counter += 1
+
+		if counter < ntrials: # Train on 11, test on 1
+			if X_train.size == 0:
+				X_train = dataset[keys]['X']
+				y_train = dataset[keys]['y']
+			else:
+				X_train = np.vstack((X_train, dataset[keys]['X']))
+				y_train = np.vstack((y_train, dataset[keys]['y']))
+
+	'''
 	hf = h5py.File(data_folder + 'dataset.h5' ,'r')
 
 	# Load datasets and true outputs
@@ -36,7 +59,7 @@ if __name__ == '__main__':
 
 	X_test = hf[('X_test')]
 	y_test = hf[('y_test')]
-
+	'''
 	# Weighting for each event
 	# [no event, FS, FO]
 	weights = np.array([10, 350, 350])
@@ -59,13 +82,34 @@ if __name__ == '__main__':
 	#plt.show()
 
 	# Contstruct the model
-	model = construct_model(input_shape=X_train.shape[1:], output_dim=3, weights=weights)
+	shape = (X_train.shape[1], X_train.shape[2] - 2) # Not training on first 2 columns (id and time)
+	model = construct_model(input_shape=shape, output_dim=3, weights=weights)
 
 	#tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 	nepochs = 10
 
-	history = train_model(model, X_train, y_train, 32, nepochs=nepochs, validation=True, validation_data=X_test, validation_truths=y_test)
+	diff_accuracy = 100
+	delta = 0.001
+	accuracy = 1
+	counter = 1
 
+	history_list = []
+
+	while diff_accuracy > delta: # While diff accuracy is greater than delta
+		print('Epoch #{}'.format(counter))
+		history = train_model(model, X_train[:,:,2:], y_train[:], 32, nepochs=1)
+
+		prev_accuracy = accuracy
+		accuracy = history.history['accuracy'][0]
+		print('Accuracy = {}'.format(accuracy))
+		diff_accuracy = abs((accuracy - prev_accuracy) / prev_accuracy * 100) # Change in accuracy
+	
+		print('Change in accuracy = {} %\n'.format(diff_accuracy))
+
+		history_list.append(history)
+
+		counter += 1
+	
 	# Save the model
 	name = 'foot_events_{}_{}_{}'.format(weights[0], weights[1], weights[2])
 	save_model(model, models_folder, '{}.h5'.format(name))

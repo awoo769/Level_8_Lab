@@ -97,22 +97,38 @@ def plot_history(history, name: str = None, save_dir: str = None):
 	nepoch = len(history.history['loss'])
 
 	plt.plot(range(nepoch),history.history['loss'],'r')
-	plt.plot(range(nepoch),history.history['val_loss'],'b')
+
+	no_val = 0
+	try:
+		plt.plot(range(nepoch),history.history['val_loss'],'b')
+	except KeyError:
+		no_val = 1
+		pass
 
 	plt.title('model loss')
 	plt.ylabel('loss')
 	plt.xlabel('epoch')
-	plt.legend(['train', 'validation'], loc='upper right')
+
+	if no_val == 1:
+		plt.legend(['train'], loc='upper right')
+	else:
+		plt.legend(['train', 'validation'], loc='upper right')
 	plt.savefig(save_dir + name + '_loss.png')
 	plt.show()	
 
 	plt.plot(range(nepoch),history.history['accuracy'],'r')
-	plt.plot(range(nepoch),history.history['val_accuracy'],'b')
+
+	if no_val == 0:
+		plt.plot(range(nepoch),history.history['val_accuracy'],'b')
 
 	plt.title('model accuracy')
 	plt.ylabel('accuracy')
 	plt.xlabel('epoch')
-	plt.legend(['train', 'validation'], loc='upper right')
+	
+	if no_val == 1:
+		plt.legend(['train'], loc='upper right')
+	else:
+		plt.legend(['train', 'validation'], loc='upper right')
 	plt.savefig(save_dir + name + '_accuracy.png')
 	plt.show()
 	

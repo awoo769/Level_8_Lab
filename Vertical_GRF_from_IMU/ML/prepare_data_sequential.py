@@ -8,6 +8,7 @@ from matplotlib import pylab as plt
 import openpyxl
 from pathlib import Path
 import h5py
+import pickle
 
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
@@ -99,11 +100,19 @@ def read_csv(filename: str):
 	return np.array(data)
 
 
-def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type: str, sample_length: int):
+def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type: str, sample_length: int, f: str):
 	'''
 	This function creates the dataset of events in which features will be extracted from
 
+	data: the data which will be split into samples of length sample_length
+	dataset: the array which is being build of the samples from each trial
+	HS_TO: a list of the truth values of the FS and FO events
+	f: the name of the trial
+
 	'''
+
+	uid = re.findall(r'\d+', f)
+	uid = int(uid[0] + uid[1])
 
 	time = data[:,0].astype(np.float) # 1st column
 
@@ -196,25 +205,22 @@ def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type:
 		# same size for ML). For the final timesteps that remain, add 0's to the end of HS_TO and 
 		# continue with what the acceleration values are.
 
-		nsamples = int(len(new_a_l[0]) / sample_length)
+		t = -np.Inf
 
-		for i in range(nsamples):
+		start_period = 0
+		end_period = start_period + sample_length
 
-			if i == 0:
-				start_period = 0
-			else:
-				start_period = end_period
-
-			end_period = start_period + sample_length
-
+		HS = np.array(heel_strike)
+		TO = np.array(toe_off)
+		while t < time[-1]:
+			if t > 15.8:
+				stop = 1
 			# Append heel strikes and toe offs which are within the range
-			HS = np.array(heel_strike)
 			sample_HS = np.intersect1d(HS[HS < end_period], HS[HS >= start_period])
 
 			# Convert into new timeframe
 			sample_HS = sample_HS - start_period
 
-			TO = np.array(toe_off)
 			sample_TO = np.intersect1d(TO[TO < end_period], TO[TO >= start_period])
 			
 			# Convert into new timeframe
@@ -230,6 +236,10 @@ def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type:
 
 			# Append accelerations which are within the range
 			temp = []
+
+			temp.append([uid]*sample_length)
+			temp.append(time[start_period:end_period])
+
 			for i in range(len(new_a_l)):
 				temp.append((new_a_l[i])[start_period:end_period])
 			
@@ -241,19 +251,23 @@ def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type:
 			else:
 				dataset = np.vstack((dataset, (np.array(temp))[np.newaxis, :]))
 
-		# For the remaining timesteps
-		remaining_timesteps = len(new_a_l[0]) - nsamples * sample_length
-		
-		start_period = end_period
+			start_period = int(end_period - sample_length/2)
+			
+			end_period = int(start_period + sample_length)
+			
+			try:
+				t = time[end_period-1] # Time at the end of the sample (for loop exiting)
+			except IndexError:
+				t = time[-1]
+
+		start_period = int(len(new_a_l[0]) - sample_length)
 
 		# Append heel strikes and toe offs which are within the range
-		HS = np.array(heel_strike)
 		sample_HS = HS[HS >= start_period]
 
 		# Convert into new timeframe
 		sample_HS = sample_HS - start_period
 
-		TO = np.array(toe_off)
 		sample_TO = TO[TO >= start_period]
 		
 		# Convert into new timeframe
@@ -269,22 +283,53 @@ def prepare_data(data: np.ndarray, dataset: np.array, HS_TO: list, dataset_type:
 
 		# Append accelerations which are within the range
 		temp = []
+		
+		temp.append([uid]*sample_length)
+		temp.append(time[start_period:end_period])
+
 		for i in range(len(new_a_l)):
-			temp.append(np.concatenate(((new_a_l[i])[start_period:], np.array([np.mean((new_a_l[i])[start_period:])] * (sample_length - remaining_timesteps)))))
+			temp.append((new_a_l[i])[start_period:])
 		
 		for i in range(len(new_a_r)):
-			temp.append(np.concatenate(((new_a_r[i])[start_period:], np.array([np.mean((new_a_r[i])[start_period:])] * (sample_length - remaining_timesteps)))))
+			temp.append((new_a_r[i])[start_period:])
 
 		if np.size(dataset) == 0:
 			dataset = (np.array(temp))[np.newaxis, :]
 		else:
 			dataset = np.vstack((dataset, (np.array(temp))[np.newaxis, :]))
 
+		''' Testing if HS_TO events are good '''
+
+		dataset = np.swapaxes(dataset, 1, -1)
+
+		HS_TO = np.array(HS_TO_init)
+		y = HS_TO[:,:,0] * 1 + HS_TO[:,:,1] * 2
+		y_test = keras.utils.to_categorical(y)
+
+		max_time = int(max(dataset[-1,:,1]) * 1000) # in ms
+		y_true = np.zeros((max_time+1, 4))
+		y_true[:,0] = np.arange(0,max_time+1)
+
+		time = (dataset[:,:,1])[:, np.newaxis]
+		time = np.swapaxes(time, 1, -1)
+
+		for i in range(len(time)):
+
+			if i == 54:
+				stop = 1
+
+			y_true[(np.squeeze(time[i]) * 1000).astype(int),1] = np.sqrt(y_true[(np.squeeze(time[i]) * 1000).astype(int),1]**2 + y_test[i,:,0]**2)
+			y_true[(np.squeeze(time[i]) * 1000).astype(int),2] = np.sqrt(y_true[(np.squeeze(time[i]) * 1000).astype(int),2]**2 + y_test[i,:,1]**2)
+			y_true[(np.squeeze(time[i]) * 1000).astype(int),3] = np.sqrt(y_true[(np.squeeze(time[i]) * 1000).astype(int),3]**2 + y_test[i,:,2]**2)
+
+		events = np.zeros((max_time,2))
+		events[HS,0] = 1
+		events[TO,1] = 1
 		return dataset, HS_TO
 
 if __name__ == '__main__':
 	''' Read in file '''
-	path = 'C:\\Users\\alexw\\Desktop\\RunningData\\'
+	path = 'C:\\Users\\alexw\\Desktop\\RunningData\\workingdir\\data\\Raw Data'
 	ext = 'csv'
 	os.chdir(path)
 	files = glob.glob('*.{}'.format(ext))
@@ -313,13 +358,35 @@ if __name__ == '__main__':
 	# Length of each sample = 600 ms
 	length = 600
 
+	# Dictionary to hold trial data and true solutions
+	dataset = {}
+
 	for f in files:
 		print('Running file: ' + str(f))
-		data = read_csv(f)
-		dataset_init, HS_TO_init = prepare_data(data, dataset_init, HS_TO_init, dataset_type[0], length)
-	
 
-		# Get mass and height data from 'Subject details.xlsx'
+		data = read_csv(f)
+
+		f = f.split('.')[0]
+
+		dataset[f] = {}
+
+		dataset_init, HS_TO_init = prepare_data(data, dataset_init, HS_TO_init, dataset_type[0], length, f)
+		
+		# Shape of the entire dataset
+		# (n, 636, 6)
+		dataset_init = np.swapaxes(dataset_init, 1, -1)
+
+		# Shape of the correct HS and TO events for each event
+		# (n, 636, 3) 1st column = no event, 2nd = FS, 3rd = FO
+		HS_TO = np.array(HS_TO_init)
+		y = HS_TO[:,:,0] * 1 + HS_TO[:,:,1] * 2
+		y_true = keras.utils.to_categorical(y)
+
+		dataset[f]['X'] = dataset_init
+		dataset[f]['y'] = y_true
+
+		dataset_init = []
+		HS_TO_init = []
 
 
 	# dataset will have n number of events. Each event has the structure:
@@ -332,38 +399,22 @@ if __name__ == '__main__':
 	#	ay
 	#	az
 
-	# Shape of each event in the dataset
-	# (636, 6) = (636, [ax_l, ay_l, az_l, ax_r, ay_r, az_r], 636)
-	# 636 is set in the first event as 200 below HS and 200 above TO.
+	dataset_folder = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical_GRF_from_IMU\\data\\"
 
-	# Shape of the entire dataset
-	# (n, 636, 6)
-	dataset = np.swapaxes(dataset_init, 1, -1)
-
-	# Shape of the correct HS and TO events for each event
-	# (n, 636, 2) where the '2' is an array of either 0 or 1 for the particular time
-	# 0 if no event, 1 if event. The first column is HS and the second is TO
-	HS_TO = np.array(HS_TO_init)
-
-	dataset_folder = "C:\\Users\\alexw\\Dropbox\\ABI\\Level_8_Lab\\Vertical GRF from IMU\\data\\"
-
-
-
-	# Train on 80 % of data, test on 20 %
-	# 3 classes. 0 = no event, 1 = foot strike, 2 = foot off
-	y = HS_TO[:,:,0] * 1 + HS_TO[:,:,1] * 2
-	y_true = keras.utils.to_categorical(y)
-
+	'''
 	X_train, X_test, y_train, y_test = train_test_split(dataset, y_true, test_size=0.2)
 	# Save datasets as h5
 	hf = h5py.File(dataset_folder + 'dataset.h5', 'w')
 
 	hf.create_dataset('X_all', data=dataset, compression="gzip")
-	hf.create_dataset('y_all', data=HS_TO, compression="gzip")
+	hf.create_dataset('y_all', data=y_true, compression="gzip")
 
 	hf.create_dataset('X_train', data=X_train, compression="gzip")
 	hf.create_dataset('y_train', data=y_train, compression="gzip")
 	hf.create_dataset('X_test', data=X_test, compression="gzip")
 	hf.create_dataset('y_test', data=y_test, compression="gzip")
-
+	'''
+	f = open(dataset_folder + "dataset.pkl", "wb")
+	pickle.dump(dataset, f)
+	f.close()
 	np.save(dataset_folder + "subject_information.npy", subject_information)
