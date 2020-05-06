@@ -1,6 +1,7 @@
-from tsfresh import extract_features, extract_relevant_features
-from tsfresh.feature_extraction import ComprehensiveFCParameters
+from tsfresh import extract_features, extract_relevant_features, select_features
+from tsfresh.feature_extraction import ComprehensiveFCParameters, MinimalFCParameters
 from tsfresh.feature_extraction.settings import from_columns
+from tsfresh.utilities.dataframe_functions import impute
 
 import pickle
 import numpy as np
@@ -8,7 +9,7 @@ import pandas as pd
 import os
 
 
-def extract_data(data_folder: str, columns: list, est_events: bool = False, event: str = None):
+def extract_data(data_folder: str, columns: list, overlap = False, all: bool = True, est_events: bool = False, event: str = None, event_type: str = None):
 	'''
 	This function uses tsFRESH to extract relevant features for multiple machine learning tasks.
 	If a csv file of features to use already exists (as features.csv), then those features will
@@ -18,16 +19,26 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 
 	data_folder: a string containing the location of the directory which the dataset.pkl is saved in.
 				 This dataset it created using data_preperation.py.
+
 	columns: a list of strings containing the columns from the dataset which the user wishes to extract 
 			 features from. This includes: id, time, ax_l, ay_l, az_l, ax_r, ay_r, az_r,
 		 	 ax_diff, ay_diff, az_diff, a_res_l, a_res_r, a_res_diff.
 			 NOTE: if id or time are not included in this list, they will be automatically added as they
 			 are necessary.
+
+	all: a boolean (either True or False). If true, feature extraction will be run using all the data, if
+		 False, feature extraction will be run using the first trial, and then that we be used on all the
+		 data.
+
 	est_events: a boolean (either True or False). If True, features will be extracted to estimate whether
 				an event occured or not within a 100 ms time frame. If False, features will be extracted
 				to estimate vertical GRF for the entire timeseries.
+
 	event: A string containing either HS or TO. This will indicate which event the user wants to predict on.
-		   NOTE: this is only necessary as an input if est_events is True.
+		NOTE: this is only necessary as an input if est_events is True.
+
+	event_type: A string containing either binary or time. This will indicate which type of output the user wants.
+		NOTE: this is only necessary as an input if est_events is True.
 	
 	Outputs:
 	This function does not return anything. However, it does save *.csv files in appropriate folders (based off
@@ -43,7 +54,11 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 	'''
 
 	# Load data
-	dataset = pickle.load(open(data_folder + "dataset.pkl", "rb"))
+	if overlap:
+		dataset = pickle.load(open(data_folder + "dataset_overlap.pkl", "rb"))
+	
+	else:
+		dataset = pickle.load(open(data_folder + "dataset_no_overlap.pkl", "rb"))
 
 	# Possible columns in dataset
 	columns_in_X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
@@ -63,9 +78,11 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 	
 	if 'id' not in columns:
 		columns_num.append(0)
+		columns.insert(0, 'id')
 	
 	if 'time' not in columns:
 		columns_num.append(1)
+		columns.insert(1, 'time')
 
 	# Sort columns in order (low to high)
 	columns_num.sort()
@@ -76,7 +93,7 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 	if os.path.isdir(new_directory):
 		# See if subfolder exists
 		if est_events:
-			if os.path.isdir("{}{}\\".format(new_directory, event)):
+			if os.path.isdir("{}{}_{}\\".format(new_directory, event, event_type)):
 				user = input('Folder already exists for this extraction, do you wish to continue? (Y/N): ')
 
 				if 'y' in user or 'Y' in user:
@@ -86,7 +103,7 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 			
 			else:
 				# Make the directory
-				os.mkdir("{}{}\\".format(new_directory, event))
+				os.mkdir("{}{}_{}\\".format(new_directory, event, event_type))
 	
 		else:
 			if os.path.isdir("{}force\\".format(new_directory)):
@@ -104,12 +121,12 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 		os.mkdir(new_directory)
 
 		if est_events:
-			os.mkdir("{}{}\\".format(new_directory, event))
+			os.mkdir("{}{}_{}\\".format(new_directory, event, event_type))
 		else:
 			os.mkdir("{}force\\".format(new_directory))
 	
 	if est_events:
-		save_dir = "{}{}\\".format(new_directory, event)
+		save_dir = "{}{}_{}\\".format(new_directory, event, event_type)
 	else:
 		save_dir = "{}force\\".format(new_directory)
 
@@ -122,9 +139,11 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 		pre_extracted = True
 
 	except FileNotFoundError: # File does not exist
-		extraction_settings = ComprehensiveFCParameters() # Use all the features and then find relevant one
 
 		pre_extracted = False
+
+	# List to append last uid's from each key (used when using all trials to extract features)
+	uid_last = []
 
 	# Iterate through all the trials in the dataset
 	for key in dataset.keys():
@@ -140,11 +159,25 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 		
 		# Create y (real data output)
 		if est_events: # If estimating events
-			if event == 'HS':
-				y_temp = dataset[key]['y_HS_binary'] # For HS
+			if event == 'HS': # For HS
+				if event_type == 'binary':
+					y = dataset[key]['y_HS_binary'] 
+
+				elif event_type == 'time':
+					y = dataset[key]['y_HS_time_to_next']
 				
-			elif event == 'TO':
-				y_temp = dataset[key]['y_HS_binary'] # For TO
+				else:
+					print('Event type must either be binary or time')
+				
+			elif event == 'TO': # For TO
+				if event_type == 'binary':
+					y = dataset[key]['y_TO_binary']
+				
+				elif event_type == 'time':
+					y = dataset[key]['y_TO_time_to_next']
+
+				else:
+					print('Event type must either be binary or time')
 
 			else:
 				print("Event must equal either 'HS' or 'TO'.")
@@ -152,7 +185,8 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 				return
 			
 			# Convert to boolean (will remain boolean if already)
-			y = (y_temp == 1.0)
+			if event_type == 'binary':
+				y = (y == 1.0)
 
 		else: # Estimating forces
 			y = dataset[key]['force'][:,2] # possible force = ['Fx', 'Fy', 'Fz'] Assuming z direction is vertical
@@ -166,7 +200,10 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 			timeseries = timeseries.astype({'id': int})
 
 			if est_events:
-				y = pd.Series(data=y, dtype=bool, name='events')
+				if event_type == 'binary':
+					y = pd.Series(data=y, dtype=bool, name='events')
+				elif event_type == 'time':
+					y = pd.Series(data=y, dtype=float, name='events')
 			else:
 				# Change ID column to fit for regression method
 				ID = (np.arange(0,len(timeseries))).astype(int)
@@ -178,30 +215,137 @@ def extract_data(data_folder: str, columns: list, est_events: bool = False, even
 		# Save X full dataset
 		timeseries.to_csv("{}{}_timeseries.csv".format(save_dir, key), index=True, header=True)
 
-		# Extract features using tsFRESH
-		if not pre_extracted:
-			print('Finding relevant features using {}'.format(key))
-			X_filtered = extract_relevant_features(timeseries, y,
-												column_id="id", column_sort="time",
-												default_fc_parameters=extraction_settings)
+		if not all:
+			# Extract features using tsFRESH
+			if not pre_extracted:
+				print('Finding relevant features using {}'.format(key))
+				X_filtered = extract_relevant_features(timeseries, y,
+													column_id="id", column_sort="time",
+													default_fc_parameters=ComprehensiveFCParameters())
+
+				X_filtered.to_csv("{}features.csv".format(save_dir), header=True)
+
+				features_string = X_filtered.columns
+				extraction_settings = from_columns(features_string) # These are the features that we will be using
+
+				pre_extracted = True
+
+			if pre_extracted:
+				print('Using pre-extracted features for event = {}'.format(event))
+				print(str(key))
+				X_filtered = extract_features(timeseries,
+											column_id="id", column_sort="time",
+											kind_to_fc_parameters=extraction_settings)
+
+			# Add start_time column to dataframe
+			start_time = dataset[key]['X_starting_time']
+			X_filtered.insert(0, "start_time", start_time, True)
+
+			# Save dataframes
+			X_filtered.to_csv("{}{}_X.csv".format(save_dir, key), index=True, header=True)
+			y.to_csv("{}{}_y.csv".format(save_dir, key), index=True, header=True)
+
+		else:
+			try:
+				uid_change = timeseries_temp['id'].iloc[-1]
+
+				uid_last.append(uid_change)
+
+				timeseries['id'] = timeseries['id'] + uid_change + 1
+				timeseries_temp = timeseries_temp.append(timeseries)
+				y_temp = y_temp.append(y, ignore_index = True)
+
+			except NameError: # *_temp DataFrames do not exist yet
+				timeseries_temp = timeseries
+				y_temp = y
+
+	if all:
+		print('Using all data to extract relevant features')
+		
+		# First remove any NaN values in y, this should only be at the end
+		print('Extracting all features')
+		X = extract_features(timeseries_temp,
+							column_id="id", column_sort="time",
+							default_fc_parameters=ComprehensiveFCParameters(),
+							impute_function=impute)
+		
+		y = y_temp
+
+		# Remove NaN index's from X and y
+		remove_idx = pd.isnull(y.to_numpy()).nonzero()[0]
+		y = y.drop(remove_idx)
+		X = X.drop(remove_idx)
+		
+		print('Selecting relevant features')
+		X_filtered = select_features(X, y)
+		
+		# Get features using all data
+		#X_filtered = extract_relevant_features(timeseries_temp, y_temp,
+		#											column_id="id", column_sort="time",
+		#											default_fc_parameters=ComprehensiveFCParameters())
+				
+		X_filtered.to_csv("{}features.csv".format(save_dir), header=True)
+		
+		# Now save individual datasets
+		# Reload DataFrame
+		X_features = pd.read_csv("{}features.csv".format(save_dir), index_col=0)
+		
+		names = X_features.index.values
+		# Saving individual trials
+		print('Saving features for each trial')
+		start = 0
+		i = 0
+		for key in dataset.keys():
+			try:
+				end_temp = uid_last[i] # Name of the row
+
+			except IndexError:
+				# Last key
+				end_temp = X_features.iloc[-1].name
+
+			end = end_temp
+
+			removed = True
+
+			while removed:
+				if end in remove_idx:
+					end -= 1
+				else:
+					removed = False
 			
-			X_filtered.to_csv("features.csv".format(save_dir), header=True)
+			# end = the name of the row (NOT index) which is the last in the trial
 
-			features_string = X_filtered.columns
-			extraction_settings = from_columns(features_string) # These are the features that we will be using
+			end_idx = np.where(names == end)[0][0]
 
-			pre_extracted = True
+			X_save = X_features.iloc[start:end_idx+1]
+			X_save = X_save.reset_index(drop=True)
 
-		if pre_extracted:
-			print('Using pre-extracted features')
-			print(str(key))
-			X_filtered = extract_features(timeseries,
-										column_id="id", column_sort="time",
-										kind_to_fc_parameters=extraction_settings)
+			y_save = y.iloc[start:end_idx+1]
+			y_save = y_save.reset_index(drop=True)
 
-		# Save dataframes
-		X_filtered.to_csv("{}{}_X.csv".format(save_dir, key), index=True, header=True)
-		y.to_csv("{}{}_y.csv".format(save_dir, key), index=True, header=True)
+			start = end_idx + 1
+			i += 1
+			'''
+			except IndexError:
+				# Last key
+				X_save = X_features.iloc[start:end_idx+1]
+				X_save = X_save.reset_index(drop=True)
+
+				y_save = y.iloc[start:]
+				y_save = y_save.reset_index(drop=True)
+			'''
+
+			# Add start_time column to dataframe
+			start_time = dataset[key]['X_starting_time']
+
+			# Remove indexes of starting time which were removed due to NaN's.
+			start_time_new = start_time[:len(X_save)]
+
+			X_save.insert(0, "start_time", start_time_new, True)
+
+			# Save
+			X_save.to_csv("{}{}_X.csv".format(save_dir, key), index=True, header=True)
+			y_save.to_csv("{}{}_y.csv".format(save_dir, key), index=True, header=True)
 
 	return
 
@@ -210,6 +354,7 @@ if __name__ == "__main__":
 
 	# HS or TO
 	event = 'HS'
+	event_type = 'binary'
 
 	data_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
 
@@ -217,4 +362,4 @@ if __name__ == "__main__":
 	# 				'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']
 	columns = ['id', 'time', 'a_res_l', 'a_res_r'] # Columns that we want to use
 
-	extract_data(data_folder=data_folder, columns=columns)#, est_events=True, event=event)
+	extract_data(data_folder=data_folder, columns=columns, all=True, est_events=True, event=event, event_type=event_type)

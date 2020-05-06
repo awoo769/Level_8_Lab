@@ -18,7 +18,7 @@ The IMU's should be placed on the medial aspect of the tibia (on each leg).
 Left coordinate system: y = up, z = towards midline, x = forward direction
 Right coordinate system: y = up, z = towards midline, x = backward direction
 
-- assuming you are using a unit from I Measure U, the little man should be facing upwards and be
+- assuming you are using a unit from IMeasureU, the little man should be facing upwards and be
 visible.
 
 05/03/2020
@@ -27,7 +27,7 @@ Alex Woodall
 '''
 
 
-def prepare_data(data: np.ndarray, sample_length: int, f: str):
+def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = False) -> (np.ndarray, np.ndarray, np.ndarray):
 	'''
 	This function creates the dataset of events in which features will be extracted from
 
@@ -35,6 +35,7 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str):
 	dataset: the array which is being build of the samples from each trial
 	HS_TO: a list of the truth values of the FS and FO events
 	f: the name of the trial
+	overlap: whether to overlap each sample by half
 
 	'''
 
@@ -171,7 +172,10 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str):
 			accelerations = np.array(acc_temp).T
 
 		# New start and end period for next iteration
-		start_period = int(end_period)
+		if overlap:
+			start_period = int(end_period - sample_length / 2)
+		else:
+			start_period = int(end_period)
 		
 		end_period = int(start_period + sample_length)
 		
@@ -185,7 +189,7 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str):
 
 		acc_temp = []
 		force_temp = []
-	'''
+	
 	# For the part of the timeseries which is left over
 	final_sample_length = len(a_diff[0]) - start_period
 
@@ -232,14 +236,14 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str):
 		force_temp.append((new_F[i])[start_period:end_period])
 
 	force = np.vstack((force, np.array(force_temp).T))
-	'''
+	
 	HS_TO = np.array(HS_TO)
 
 	return accelerations, HS_TO, force
 
 if __name__ == '__main__':
 	''' Read in file '''
-	path = 'C:\\Users\\alexw\\Desktop\\RunningData\\workingdir\\data\\Raw Data'
+	path = 'C:\\Users\\alexw\\Desktop\\tsFRESH\\Raw Data'
 	ext = 'csv'
 	os.chdir(path)
 	files = glob.glob('*.{}'.format(ext))
@@ -275,7 +279,7 @@ if __name__ == '__main__':
 
 		dataset[f] = {}
 
-		X, y, force = prepare_data(data, length, f)
+		X, y, force = prepare_data(data, length, f, True)
 
 		# Get number of samples
 		uids = list(set(X[:,0]))
@@ -286,8 +290,12 @@ if __name__ == '__main__':
 		HS_time_to = np.repeat(-1, len(uids))
 		TO_time_to = np.repeat(-1, len(uids))
 
+		X_starting_time = np.zeros(len(HS_time_to))
+
 		for uid in uids:
 			uid_ind = np.where(X[:,0] == uid)[0]
+
+			X_starting_time[int(uid)] = X[uid_ind[0],1] * 1000
 			
 			# Binary did an event happen in each sample
 			if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event	
@@ -298,17 +306,51 @@ if __name__ == '__main__':
 			
 			# Time to this event in each sample, will be -1 if no event
 			if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event
-				HS_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,0] == 1)[0]
+				HS_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,0] == 1)[0] + X[uid_ind[0],1] * 1000
 
 			if 1 in y[uid_ind[0]:uid_ind[-1]+1,1]: # If there is a TO event
-				TO_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,1] == 1)[0]
+				TO_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,1] == 1)[0] + X[uid_ind[0],1] * 1000
+
+		# Time to next event from beginning of sample HS
+		HS_time_to_next = np.zeros(len(HS_time_to))
+		event_time = np.NaN
+
+		for i in range(len(HS_time_to)):
+			# Go backwards through array
+			if HS_time_to[-1 - i] != -1:
+				event_time = HS_time_to[-1 - i]
+
+			if np.isnan(event_time): # If an event hasn't occured yet
+				HS_time_to_next[-1 - i] = np.NaN
+			
+			else:
+				HS_time_to_next[-1 - i] = event_time - X_starting_time[-1 - i]
+			
+		# Time to next event from beginning of sample TO
+		TO_time_to_next = np.zeros(len(TO_time_to))
+		event_time = np.NaN
+
+		for i in range(len(TO_time_to)):
+			# Go backwards through array
+			if TO_time_to[-1 - i] != -1:
+				event_time = TO_time_to[-1 - i]
+
+			if np.isnan(event_time): # If an event hasn't occured yet
+				TO_time_to_next[-1 - i] = np.NaN
+			
+			else:
+				TO_time_to_next[-1 - i] = event_time - X_starting_time[-1 - i]
+
 
 		dataset[f]['X'] = X
+		dataset[f]['X_starting_time'] = X_starting_time
 
 		dataset[f]['y_HS_binary'] = HS_binary
 		dataset[f]['y_TO_binary'] = TO_binary
 		dataset[f]['y_HS_time_to'] = HS_time_to
 		dataset[f]['y_TO_time_to'] = TO_time_to
+		dataset[f]['y_HS_time_to_next'] = HS_time_to_next
+		dataset[f]['y_TO_time_to_next'] = TO_time_to_next
 
 		dataset[f]['force'] = force
 

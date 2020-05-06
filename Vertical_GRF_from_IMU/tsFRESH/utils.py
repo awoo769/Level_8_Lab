@@ -86,7 +86,7 @@ def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
 	return filter_plate
 
 
-def load_features(base_data_folder: str, data_folder: str, est_events=False) -> (dict, dict, list): 
+def load_features(base_data_folder: str, data_folder: str, est_events: bool =False, overlap: bool = False) -> (dict, dict, list): 
 
 	if data_folder == -1:
 		return -1, -1, -1
@@ -96,7 +96,11 @@ def load_features(base_data_folder: str, data_folder: str, est_events=False) -> 
 	y_dictionary = {}
 
 	# To use the keys in the dictionary
-	dataset = pickle.load(open("{}dataset.pkl".format(base_data_folder), "rb"))
+	if overlap:
+		dataset = pickle.load(open("{}overlap_dataset.pkl".format(base_data_folder), "rb"))
+	
+	else:
+		dataset = pickle.load(open("{}dataset_no_overlap.pkl".format(base_data_folder), "rb"))
 
 	for key in dataset.keys():
 		# pd.DataFrame
@@ -118,7 +122,7 @@ def load_features(base_data_folder: str, data_folder: str, est_events=False) -> 
 	return X_dictionary, y_dictionary, groups
 
 
-def get_directory(initial_directory: str, columns: list, est_events: str = False, event: str = None) -> str:
+def get_directory(initial_directory: str, columns: list, est_events: str = False, event: str = None, event_type: str = None) -> str:
 
 	columns_in_X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
 		 				'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']
@@ -142,34 +146,104 @@ def get_directory(initial_directory: str, columns: list, est_events: str = False
 	columns_num.sort()
 
 	new_directory = "{}{}\\".format(initial_directory, ("_".join(map(str,columns_num))))
-	# Check that directory exists
-	if os.path.isdir(new_directory):
-		# See if subfolder exists
-		if est_events:
-			if os.path.isdir(new_directory + event + "\\"):
-				pass
-			
-			else:
-				print('Directory for this event for the chosen colums does not exist')
+	
+	final_dir = False
+	while not final_dir:
+		# Check that directory exists
+		if os.path.isdir(new_directory):
+			# See if subfolder exists
+			if est_events:
+				if os.path.isdir("{}{}_{}\\".format(new_directory, event, event_type)):
+					final_dir = True
+				
+				else:
+					print('Directory for this event for the chosen colums does not exist')
+					print('Creating directory')
 
-				return -1
+					os.mkdir("{}{}_{}\\".format(new_directory, event, event_type))
+
+					final_dir = True
+
+			else:
+				if os.path.isdir("{}force\\".format(new_directory)):
+					final_dir = True
+
+				else:
+					print('Directory for this event for the chosen colums does not exist')
+					print('Creating directory')
+					os.mkdir("{}force\\".format(new_directory))
+
+					final_dir = True
 		else:
-			if os.path.isdir(new_directory + "force\\"):
-				pass
-
-			else:
-				print('Directory for this event for the chosen colums does not exist')
-
-				return -1
-
-	else:
-		print('Directory for these columns does not exist')
-
-		return -1
+			print('Directory for these columns does not exist')
+			print('Creating directory')
+			os.mkdir(new_directory)
 	
 	if est_events:
-		save_dir = new_directory + event + "\\"
+		save_dir = "{}{}_{}\\".format(new_directory, event, event_type)
 	else:
-		save_dir = new_directory + "force\\"
+		save_dir = "{}force\\".format(new_directory)
 
 	return save_dir
+
+
+def resolve_overlap(y: pd.Series, start_times: list) -> pd.Series:
+
+
+	# Ignoring any predicted times in y which are less than 10 and greater than 90 (edge cases)
+	y = y.where(y >= 10, np.NaN)
+	y = y.where(y <= 90, np.NaN)
+
+	# List of values which correspond to
+	# 0 - 99, 100 - 199, etc (no overlap)
+	y_without_overlap = y.iloc[0::2]
+	y_overlap_values = y.iloc[1::2]
+
+
+	# A list which will have estimates for sample
+	estimates = []
+
+	for i in range(0, len(start_times), 2):
+		# each sample contains 100 ms of data, 50 ms of overlap from the previous data.
+
+		# First sample estimate
+		est0 = y.iloc[i]
+
+		if i == len(start_times) - 1:
+			tu2=1
+
+		
+		elif i == len(start_times) - 2:
+			if est0 < 50 and est0 is not np.NaN:
+				if y.iloc[i-1] > 49:
+					est1 = y.iloc[i-1] - 50
+				else:
+					est1 = np.NaN
+
+
+		elif est0 < 50 and est0 is not np.NaN and i == 0:
+			mean_est = est0
+		
+		elif est0 < 50 and est0 is not np.NaN:
+			if y.iloc[i-1] > 49:
+				est1 = y.iloc[i-1] - 50
+			else:
+				est1 = np.NaN
+
+		elif est0 > 50:
+			# Can only look forward
+			if y.iloc[i+1] < 50:
+				est1 = y.iloc[i+1] + 50
+			else:
+				est1 = np.NaN
+		
+			# Take mean
+			mean_est = np.nanmean(np.array([est0, est1]))
+
+		
+			
+			
+
+		estimates.append(mean_est)
+
+

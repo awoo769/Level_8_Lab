@@ -18,7 +18,7 @@ from scipy import signal
 
 from utils import get_directory, load_features, rezero_filter
 
-def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_split: float = None):
+def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, groups: list, test_split: float = None, name: str = None):
 	'''
 	This function trains either a classification or regression random forest model. It is able to handle
 	either a singular pandas DataFrame or a dictionary of pandas DataFrames. If the input is a singular
@@ -37,6 +37,9 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 	test_split: the decimal percentage to split the training and testing datasets
 				NOTE: this is only required if the X/y input is not a dictionary
 
+	none: the name of the trial
+		  NOTE: this is only required if the X/y input is not a dictionary
+
 	Alex Woodall
 
 	Auckland Bioengineering Institute
@@ -44,13 +47,21 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 	08/04/2020
 
 	'''
+
+	if 'force' in data_folder or 'time' in data_folder:
+		mode = 'regression'
+	
+	elif 'binary' in data_folder:
+		mode = 'classification'
+
+
 	if type(X) is pd.DataFrame:
 		# Learning using one trial (or a combination into a DataFrame rather than a dictionary of DataFrames)
 		
-		try:
+		if mode == 'classification':
 			X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split)
 
-			cl = RandomForestClassifier(n_estimators=128)
+			cl = RandomForestClassifier(n_estimators=128, n_jobs=-1)
 
 			cl.fit(X_train, y_train)
 
@@ -66,7 +77,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 			conf_mat = confusion_matrix(y_test, y_predict)
 			print(conf_mat)
 
-		except ValueError: # Should be a regression model
+		elif mode == 'regression':
 
 			split_int = int(len(X) * (1 - test_split))
 
@@ -75,7 +86,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 			X_test = X.tail(len(X) - split_int) 
 			y_test = y.tail(len(X) - split_int)
 
-			rg = RandomForestRegressor(n_estimators=20)
+			rg = RandomForestRegressor(n_estimators=20, n_jobs=-1)
 
 			rg.fit(X_train, y_train)
 
@@ -110,11 +121,11 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 			plt.legend()
 			plt.ylabel('Force (N)')
 			plt.xlabel('Time (ms)')
-			plt.title('Estimated data')
+			plt.title('Estimated data for {}'.format(name))
 
 			score = round(score, 4)
 			
-			plt.savefig('{}{}.png'.format(data_folder, '_'.join(str(score).split('.'))))
+			plt.savefig('{}{}_{}.png'.format(data_folder, name, '_'.join(str(score).split('.'))))
 			plt.show()
 	
 	elif type(X) is dict:
@@ -123,93 +134,135 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, test_
 		logo = LeaveOneGroupOut()
 		logo.get_n_splits(groups=group_num)
 
-		try:
+		if mode == 'classification':
+			# Create results text file
+			f = open("{}results.txt".format(data_folder), "w")
+			f.write("Results for classification\n\n")
+			f.close()
+
 			roc = []
-			for train_index, test_index in logo.split(X=X_dictionary, groups=group_num):
-				cl = RandomForestClassifier(n_estimators=64)
+			for train_index, test_index in logo.split(X=X, groups=group_num):
+				cl = RandomForestClassifier(n_estimators=128, n_jobs=-1)
 
 				# Training data
-				print('Creating train datasets')
-				for index in train_index:
-					X_train = X_dictionary[groups[index]]
-					y_train = y_dictionary[groups[index]]
+				print('Hold out trial: {}'.format(groups[test_index[0]]))
 
-					print('Fitting to model\nDataset: {}'.format(index))
-					cl.fit(X_train, y_train)
+				for index in train_index:
+					try:
+						X_train = X_train.append(X[groups[index]], ignore_index = True)
+						y_train = y_train.append(y[groups[index]], ignore_index = True)
+					
+					except NameError:
+						X_train = X[groups[index]]
+						y_train = y[groups[index]]
+
+				cl.fit(X_train, y_train)
 				
 				# Testing data
-				print('Creating test datasets')
-				for index in test_index:
-					X_test = X_dictionary[groups[index]]
-					y_test = y_dictionary[groups[index]]
+				X_test = X[groups[test_index[0]]]
+				y_test = y[groups[test_index[0]]]
 				
 				# Predict
-				print('Predicting')
 				y_estimate_test = cl.predict(X_test)
 				y_estimate_test = pd.Series(y_estimate_test, index=X_test.index)
 
 				roc.append(roc_auc_score(y_test, y_estimate_test))
 
-				print(roc)
+				conf = confusion_matrix(y_test, y_estimate_test)
+
+				np.savetxt("{}y_estimate_conf_{}.txt".format(data_folder, groups[test_index[0]]), conf, delimiter='\t', fmt='%i')
+
+				f = open("{}results.txt".format(data_folder), "a")
+				f.write("Predicting on {}: {}\n".format(groups[test_index[0]], round(roc[-1], 4)))
+				f.close()
 
 				# Save estimate
-				y_estimate_test.to_csv("{}y_estimate_test_{}.csv".format(data_folder, index), index=True, header=True)
+				y_estimate_test.to_csv("{}y_estimate_test_{}.csv".format(data_folder, groups[test_index[0]]), index=True, header=True)
 
-			print("Mean score (using roc auc score): {}".format(statistics.mean(roc)))
+				# Remove datasets
+				del X_train
+				del X_test
+				del y_train
+				del y_test
 
-			f = open(data_folder + "cl.pkl", "wb")
-			pickle.dump(cl, f)
+				# Save model
+				f = open("{}{}_cl.pkl".format(data_folder, groups[test_index[0]]), "wb")
+				pickle.dump(cl, f)
+				f.close()
+
+			f = open("{}results.txt".format(data_folder), "a")
+			f.write("\nAverage roc auc score: {}".format(round(statistics.mean(roc), 4)))
 			f.close()
-		
-		except ValueError:
-			j = 0
+
+		elif mode == 'regression':
+
+			if 'force' in data_folder:
+				n_estimators = 10
+			
+			else:
+				n_estimators = 10
+
+			# Create results text file
+			f = open("{}results.txt".format(data_folder), "w")
+			f.write("Results for regression\n\n")
+			f.close()
+
 			r2 = []
 
-			for train_index, test_index in logo.split(X=X_dictionary, groups=group_num):
-				rg = RandomForestRegressor(n_estimators=64)
+			for train_index, test_index in logo.split(X=X, groups=group_num):
+				rg = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1)
 				
 				# Training data
-				print('Creating train datasets')
-				for index in train_index:
-					X_train = X_dictionary[groups[index]]
-					y_train = y_dictionary[groups[index]]
+				print('Hold out trial: {}'.format(groups[test_index[0]]))
 
-					print('Fitting to model\nDataset: {}'.format(index))
-					rg.fit(X_train, y_train)
+				for index in train_index:
+					try:
+						X_train = X_train.append(X[groups[index]], ignore_index = True)
+						y_train = y_train.append(y[groups[index]], ignore_index = True)
+					
+					except NameError:
+						X_train = X[groups[index]]
+						y_train = y[groups[index]]
+
+				rg.fit(X_train, y_train)
 				
 				# Testing data
-				print('Creating test datasets')
-				for index in test_index:
-					X_test = X_dictionary[groups[index]]
-					y_test = y_dictionary[groups[index]]
-
-				# Fit to model
-				#print('Fitting to model')
-				#rg.fit(X_train, y_train)
-
+				X_test = X[groups[test_index[0]]]
+				y_test = y[groups[test_index[0]]]
+				
 				# Predict
-				print('Predicting')
 				y_estimate_test = rg.predict(X_test)
+				
+				# Round estimate to a whole number
+				y_estimate_test = np.around(y_estimate_test)
+				
+				# Any negative number = -1
+				y_estimate_test[y_estimate_test < 0] = -1
+				
 				y_estimate_test = pd.Series(y_estimate_test, index=X_test.index)
 
-				# Print result
-				plt.plot(y_test,'b.', label='True data')
-				plt.plot(y_estimate_test,'r.', label='Estimate data')
-				plt.legend()
-				plt.ylabel('Force (N)')
-				plt.xlabel('Time (ms)')
-				plt.title('Estimated data')
-				#plt.show()
-				plt.savefig(data_folder + 'trial_{}.png'.format(j))
-				j += 1
 				r2.append(r2_score(y_test, y_estimate_test))
 
-				print(r2)
+				f = open("{}results.txt".format(data_folder), "a")
+				f.write("Predicting on {}: {}\n".format(groups[test_index[0]], round(r2[-1], 4)))
+				f.close()
 
-			print("Mean score (using mean squared error): {}".format(statistics.mean(r2)))
+				# Save estimate
+				y_estimate_test.to_csv("{}y_estimate_test_{}.csv".format(data_folder, groups[test_index[0]]), index=True, header=True)
 
-			f = open(data_folder + "rg.pkl", "wb")
-			pickle.dump(rg, f)
+				# Remove datasets
+				del X_train
+				del X_test
+				del y_train
+				del y_test
+
+				# Save model
+				f = open("{}{}_rg.pkl".format(data_folder, groups[test_index[0]]), "wb")
+				pickle.dump(rg, f)
+				f.close()
+
+			f = open("{}results.txt".format(data_folder), "a")
+			f.write("\nAverage R^2 score: {}".format(round(statistics.mean(r2), 4)))
 			f.close()
 
 	else:
@@ -227,17 +280,17 @@ if __name__ == "__main__":
 
 	# columns in X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
 	# 				'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']
-	columns = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r']
+	columns = ['id', 'time', 'a_res_l', 'a_res_r']
 	#columns = ['id', 'time', 'ax_diff', 'ay_diff', 'az_diff', 'a_res_diff'] # Columns that we want to use
 
-	directory = get_directory(initial_directory=data_folder, columns=columns)#, est_events=True, event=event)
+	directory = get_directory(initial_directory=data_folder, columns=columns, est_events=True, event=event)
 
 	# Load features (after extract data has been run)
-	X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=False)
+	X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=True)
 
-	# NaN being created. Try to use all datasets to get features
-	X = X_dictionary[groups[0]]
-	y = y_dictionary[groups[0]]
+	i = 6
+	X = X_dictionary[groups[i]]
+	y = y_dictionary[groups[i]]
 
 	test_split = 0.33
-	learn(X, y, directory, test_split)
+	learn(X_dictionary, y_dictionary, directory, groups)
