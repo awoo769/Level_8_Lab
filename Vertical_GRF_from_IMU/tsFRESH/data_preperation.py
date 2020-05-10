@@ -1,14 +1,3 @@
-import os
-import glob
-import numpy as np
-from scipy import signal
-from matplotlib import pylab as plt
-import openpyxl
-from pathlib import Path
-import pickle
-
-from utils import read_csv, rezero_filter
-
 '''
 This script prepares acceleration data from ankle worn IMU's to find HS and TO events using a machine
 learning process.
@@ -21,11 +10,12 @@ Right coordinate system: y = up, z = towards midline, x = backward direction
 - assuming you are using a unit from IMeasureU, the little man should be facing upwards and be
 visible.
 
+During this function, acceleration and force plate data will be interpolated to be at 1000 Hz
+
 05/03/2020
 Alex Woodall
 
 '''
-
 
 def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = False) -> (np.ndarray, np.ndarray, np.ndarray):
 	'''
@@ -39,6 +29,9 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 
 	'''
 
+	from scipy import signal
+
+	# Time array is the first value in the data
 	time = data[:,0].astype(np.float) # 1st column
 
 	# Left foot
@@ -50,6 +43,10 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 	# Flip the x acceleration on the right foot. This will make the coordinate frames mirrored along the sagittal plane
 	a_r[0] = -a_r[0]
 
+	# Interpolate acceleration data to ensure that is it at 1000 Hz
+	_, a_l = interpolate_data(time, a_l)
+	_, a_r = interpolate_data(time, a_r)
+
 	# Engineered timeseries
 	a_diff = abs(a_l - a_r) # Difference between left and right
 	a_res_l = np.linalg.norm(a_l, axis=0) # Left resultant
@@ -58,6 +55,7 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 
 	# Get force plate data for comparison
 	F = (data[:,1:3+1].T).astype(np.float) #[Fx, Fy, Fz]; Fz = vertical
+	time, F = interpolate_data(time, F)
 
 	# Rotate 180 deg around y axis (inverse Fx and Fz)
 	F[0] = -F[0] # Fx
@@ -78,8 +76,8 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 	threshold = 20 # 20 N
 	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
 	
-	for i in range(len(F)): # Fx, Fy, Fz
-		new_F[i,:] = filter_plate * new_F[i,:]
+	# Re-zero the filtered GRFs
+	new_F = new_F * filter_plate
 	
 	''' Ground truth event timings '''
 	# Get the points where there is force applied to the force plate (stance phase). Beginning = heel strike, end = toe off
@@ -87,15 +85,15 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 	toe_off = []
 
 	for i in range(1, len(new_F[2])-1):
+		# FS
 		if (new_F[2])[i-1] == 0 and (new_F[2])[i] != 0:
 			heel_strike.append(i-1)
 		
+		# FO
 		if (new_F[2])[i+1] == 0 and (new_F[2])[i] != 0:
 			toe_off.append(i+1)
 
-	# We now need to split each into individual samples of length sample_length ms (needs to be the
-	# same size for ML). For the final timesteps that remain, add 0's to the end of HS_TO and 
-	# continue with what the acceleration values are.
+	# We now need to split each into individual samples of length sample_length ms.
 
 	# Initial time
 	t = -np.Inf
@@ -115,6 +113,7 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 	acc_temp = []
 	force_temp = []
 
+	# Run until t is equal to the final time iteration
 	while t < time[-1]:
 
 		# Append heel strikes and toe offs which are within the range
@@ -140,7 +139,6 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 			HS_TO = temp_HS_TO
 
 		# Append accelerations which are within the range
-
 		acc_temp.append([uid]*sample_length) # Unique id
 		acc_temp.append(time[start_period:end_period]) # time
 
@@ -187,6 +185,7 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 
 		uid += 1 # Increase uid
 
+		# Reset acceleration and force lists
 		acc_temp = []
 		force_temp = []
 	
@@ -241,19 +240,147 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 
 	return accelerations, HS_TO, force
 
-if __name__ == '__main__':
-	''' Read in file '''
-	path = 'C:\\Users\\alexw\\Desktop\\tsFRESH\\Raw Data'
-	ext = 'csv'
-	os.chdir(path)
-	files = glob.glob('*.{}'.format(ext))
+
+def create_dataset(dataset_dict: dict, sample_length: int, f: str) -> dict:
+	'''
+	This function is calls the prepare_data function. It will gather the output
+	of the prepare_data and use it to create the truth values to be used to predict
+	events and timeseries.
+
+	08/05/2020
+	Alex Woodall
+
+	'''
+	# Import required functions
+	from utils import read_csv
+
+	# Localise functions for speed improvements
+	zeros = np.zeros
+	repeat = np.repeat
+	where = np.where
+	NaN = np.NaN
+	isnan = np.isnan
+
+	# Load the data
+	data = read_csv(f)
+
+	# Get the name of the trial and use it as the dictionary key
+	f = f.split('.')[0]
+	f = f.split('\\')[-1]
+	dataset_dict[f] = {}
+
+	# Sort the data into samples and pre-process data for analysis
+	X, y, force = prepare_data(data=data, sample_length=sample_length, f=f, overlap=True)
+
+	# Get number of samples
+	uids = list(set(X[:,0]))
 	
+	# Create binary output arrays
+	HS_binary = zeros(len(uids))
+	TO_binary = zeros(len(uids))
+
+	# Create time to event output arrays
+	HS_time_to = repeat(-1, len(uids))
+	TO_time_to = repeat(-1, len(uids))
+
+	# Create starting time output (of each sample)
+	X_starting_time = zeros(len(HS_time_to))
+
+	# For each sample
+	for uid in uids:
+		# Get the indices of each point in the sample
+		uid_ind = where(X[:,0] == uid)[0]
+
+		# The starting time (in ms)
+		X_starting_time[int(uid)] = X[uid_ind[0],1] * 1000
+		
+		# Binary did an event happen in each sample
+		if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event	
+			HS_binary[int(uid)] = 1.0
+		
+		if 1 in y[uid_ind[0]:uid_ind[-1]+1,1]: # If there is a TO event
+			TO_binary[int(uid)] = 1.0
+		
+		# Time to this event in each sample, will be -1 if no event
+		if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event
+			HS_time_to[int(uid)] = where(y[uid_ind[0]:uid_ind[-1]+1,0] == 1)[0] + X[uid_ind[0],1] * 1000
+
+		if 1 in y[uid_ind[0]:uid_ind[-1]+1,1]: # If there is a TO event
+			TO_time_to[int(uid)] = where(y[uid_ind[0]:uid_ind[-1]+1,1] == 1)[0] + X[uid_ind[0],1] * 1000
+
+	# Time to next event (FS and FO) from beginning of sample
+	HS_time_to_next = [0] * len(HS_time_to)
+	HS_time_to = list(HS_time_to)
+
+	TO_time_to_next = [0] * len(TO_time_to)
+	TO_time_to = list(TO_time_to)
+
+	for j in range(2):
+		event_time = NaN
+
+		if j == 0:
+			time_to = HS_time_to
+			time_to_next = HS_time_to_next
+		
+		else:
+			time_to = TO_time_to
+			time_to_next = TO_time_to_next
+
+		for i in range(len(time_to)):
+			# Go backwards through array
+			if time_to[-1 - i] != -1:
+				# Update event time
+				event_time = time_to[-1 - i]
+
+			if isnan(event_time): # If an event hasn't occured yet
+				time_to_next[-1 - i] = NaN
+			
+			else:
+				# The time to next event
+				time_to_next[-1 - i] = event_time - X_starting_time[-1 - i]
+	
+	HS_time_to_next = np.array(HS_time_to_next)
+	TO_time_to_next = np.array(TO_time_to_next)
+
+	# Save to the dataset dictionary
+	dataset_dict[f]['X'] = X
+	dataset_dict[f]['X_starting_time'] = X_starting_time
+
+	dataset_dict[f]['y_HS_binary'] = HS_binary
+	dataset_dict[f]['y_TO_binary'] = TO_binary
+	dataset_dict[f]['y_HS_time_to'] = HS_time_to
+	dataset_dict[f]['y_TO_time_to'] = TO_time_to
+	dataset_dict[f]['y_HS_time_to_next'] = HS_time_to_next
+	dataset_dict[f]['y_TO_time_to_next'] = TO_time_to_next
+
+	dataset_dict[f]['force'] = force
+
+	return dataset_dict
+
+
+def get_subject_info(path: str) -> np.array:
+	'''
+	This function opens the subject infomation excel workbook and saves it to a numpy array
+
+	08/05/2020
+	Alex Woodall
+
+	'''
+
+	import openpyxl
+	from pathlib import Path
+
+	# Localise functions for speed improvements
+	array = np.array
+
+	# Open excel file
 	xlsx_file = Path(path, 'Subject details.xlsx')
 	wb_obj = openpyxl.load_workbook(xlsx_file)
 	sheet = wb_obj.active
 
 	subject_information = []
 
+	# Extract subject infomation
 	for row in sheet.iter_rows():
 		temp_info = []
 
@@ -262,101 +389,45 @@ if __name__ == '__main__':
 		
 		# List of subject information: ID, Gender, Height, Weight
 		subject_information.append(temp_info)
-	subject_information = np.array(subject_information)
 
-	# Length of each sample = 600 ms
+	subject_information = array(subject_information)
+
+	return subject_information
+
+import glob
+import numpy as np
+import pickle
+
+from utils import read_csv, rezero_filter, interpolate_data
+
+if __name__ == '__main__':
+
+	# Localise functions for speed improvements
+	save = np.save
+	dump = pickle.dump
+
+	# Select path and read all .csv files (these will be the trial data)
+	path = 'C:\\Users\\alexw\\Desktop\\tsFRESH\\Raw Data\\'
+	ext = 'csv'
+	files = glob.glob('{}*.{}'.format(path, ext))
+	
+	# Length of each sample = 100 ms
 	length = 100
 
-	# Dictionary to hold trial data and true solutions
+	# Dictionary to hold trial data and truth solutions
 	dataset = {}
 
 	for f in files:
 		print('Running file: ' + str(f))
 
-		data = read_csv(f)
+		dataset = create_dataset(dataset, length, f)
 
-		f = f.split('.')[0]
-
-		dataset[f] = {}
-
-		X, y, force = prepare_data(data, length, f, True)
-
-		# Get number of samples
-		uids = list(set(X[:,0]))
-
-		HS_binary = np.zeros(len(uids))
-		TO_binary = np.zeros(len(uids))
-
-		HS_time_to = np.repeat(-1, len(uids))
-		TO_time_to = np.repeat(-1, len(uids))
-
-		X_starting_time = np.zeros(len(HS_time_to))
-
-		for uid in uids:
-			uid_ind = np.where(X[:,0] == uid)[0]
-
-			X_starting_time[int(uid)] = X[uid_ind[0],1] * 1000
-			
-			# Binary did an event happen in each sample
-			if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event	
-				HS_binary[int(uid)] = 1.0
-			
-			if 1 in y[uid_ind[0]:uid_ind[-1]+1,1]: # If there is a TO event
-				TO_binary[int(uid)] = 1.0
-			
-			# Time to this event in each sample, will be -1 if no event
-			if 1 in y[uid_ind[0]:uid_ind[-1]+1,0]: # If there is a HS event
-				HS_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,0] == 1)[0] + X[uid_ind[0],1] * 1000
-
-			if 1 in y[uid_ind[0]:uid_ind[-1]+1,1]: # If there is a TO event
-				TO_time_to[int(uid)] = np.where(y[uid_ind[0]:uid_ind[-1]+1,1] == 1)[0] + X[uid_ind[0],1] * 1000
-
-		# Time to next event from beginning of sample HS
-		HS_time_to_next = np.zeros(len(HS_time_to))
-		event_time = np.NaN
-
-		for i in range(len(HS_time_to)):
-			# Go backwards through array
-			if HS_time_to[-1 - i] != -1:
-				event_time = HS_time_to[-1 - i]
-
-			if np.isnan(event_time): # If an event hasn't occured yet
-				HS_time_to_next[-1 - i] = np.NaN
-			
-			else:
-				HS_time_to_next[-1 - i] = event_time - X_starting_time[-1 - i]
-			
-		# Time to next event from beginning of sample TO
-		TO_time_to_next = np.zeros(len(TO_time_to))
-		event_time = np.NaN
-
-		for i in range(len(TO_time_to)):
-			# Go backwards through array
-			if TO_time_to[-1 - i] != -1:
-				event_time = TO_time_to[-1 - i]
-
-			if np.isnan(event_time): # If an event hasn't occured yet
-				TO_time_to_next[-1 - i] = np.NaN
-			
-			else:
-				TO_time_to_next[-1 - i] = event_time - X_starting_time[-1 - i]
-
-
-		dataset[f]['X'] = X
-		dataset[f]['X_starting_time'] = X_starting_time
-
-		dataset[f]['y_HS_binary'] = HS_binary
-		dataset[f]['y_TO_binary'] = TO_binary
-		dataset[f]['y_HS_time_to'] = HS_time_to
-		dataset[f]['y_TO_time_to'] = TO_time_to
-		dataset[f]['y_HS_time_to_next'] = HS_time_to_next
-		dataset[f]['y_TO_time_to_next'] = TO_time_to_next
-
-		dataset[f]['force'] = force
-
+	# Save dataset
 	dataset_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
-
 	f = open(dataset_folder + "dataset.pkl", "wb")
-	pickle.dump(dataset, f)
+	dump(dataset, f)
 	f.close()
-	np.save(dataset_folder + "subject_information.npy", subject_information)
+
+	# Get subject information and save
+	subject_information = get_subject_info(path)
+	save(dataset_folder + "subject_information.npy", subject_information)

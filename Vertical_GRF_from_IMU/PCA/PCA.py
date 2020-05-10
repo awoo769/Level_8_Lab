@@ -64,6 +64,9 @@ for f in files:
 	print('Explained variance of first component: {}'.format(explained_variance[-1]))
 	print('Explained variance ratio of first component:: {}'.format(explained_variance_ratio[-1]))
 
+	plt.plot(res[0])
+	plt.show()
+
 print('Mean explained variance of first component:e: {}'.format(np.mean(explained_variance)))
 print('Mean explained variance ratio of first component:: {}'.format(np.mean(explained_variance_ratio)))
 

@@ -187,6 +187,53 @@ def get_directory(initial_directory: str, columns: list, est_events: str = False
 	return save_dir
 
 
+def interpolate_data(time: np.ndarray, x: np.ndarray):
+	from scipy import interpolate
+	import numpy as np
+
+	# Assumes the time array is in SI units
+	ninterpolates_points = int((time[-1] - time[0]) * 1000) + 1
+
+	# Create the new time array for interpolation
+	new_t = np.linspace(time[0], time[-1], ninterpolates_points)
+	reversed_axes = False
+	# x should have shape (n, len(time))
+	try:
+		assert x.shape[1] == len(time)
+	except Exception as e:
+		
+		if isinstance(e, IndexError):
+			# 1 D
+			x = x[np.newaxis,:]
+
+		elif isinstance(e, AssertionError):
+		
+				try:
+					assert x.shape[0] == len(time)
+
+					x = np.swapaxes(x, 1, 0)
+					reversed_axes = True
+
+				except AssertionError:
+					print('Dimensions in time array and data do not align')
+
+	new_x = np.zeros(np.shape(x))
+	i = 0
+	for item in x:
+		tck_x = interpolate.splrep(time, item, s=0)
+		new_item = interpolate.splev(new_t, tck_x, der=0)
+
+		new_x[i,:] = new_item
+
+		i += 1
+	
+	if reversed_axes:
+		new_x = np.swapaxes(new_x, 1, 0)
+	
+	return new_t, new_x
+
+
+
 def resolve_overlap(y: pd.Series, start_times: list) -> pd.Series:
 
 
