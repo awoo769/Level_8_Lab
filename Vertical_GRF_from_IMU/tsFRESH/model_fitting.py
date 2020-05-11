@@ -59,26 +59,29 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 		# Learning using one trial (or a combination into a DataFrame rather than a dictionary of DataFrames)
 		
 		if mode == 'classification':
+			# Split into training and testing
 			X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split)
 
+			# Create classifier and train
 			cl = RandomForestClassifier(n_estimators=128, n_jobs=-1)
-
 			cl.fit(X_train, y_train)
 
+			# Predict on classifier and convert to a pandas series, save output
 			y_predict = cl.predict(X_test)
 			y_predict = pd.Series(y_predict, index=X_test.index)
 
 			y_predict.to_csv("{}y_predict.csv".format(data_folder), index=True, header=True)
 			y_test.to_csv("{}y_test.csv".format(data_folder), index=True, header=True)
 
+			# Print score and confusion matrix
 			score = roc_auc_score(y_test, y_predict)
-			print("Roc auc = {}\n".format(score))
-
 			conf_mat = confusion_matrix(y_test, y_predict)
+
+			print("Roc auc = {}\n".format(score))
 			print(conf_mat)
 
 		elif mode == 'regression':
-
+			# Split into training and testing
 			split_int = int(len(X) * (1 - test_split))
 
 			X_train = X.head(split_int)
@@ -86,10 +89,11 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			X_test = X.tail(len(X) - split_int) 
 			y_test = y.tail(len(X) - split_int)
 
+			# Create regressor and train
 			rg = RandomForestRegressor(n_estimators=20, n_jobs=-1)
-
 			rg.fit(X_train, y_train)
 
+			# Predict
 			y_predict = rg.predict(X_test)
 
 			# Filter force array
@@ -107,11 +111,12 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			
 			y_predict = filter_plate * new_F
 
+			# Convert output into a pandas series and save
 			y_predict = pd.Series(y_predict, index=X_test.index)
-
 			y_predict.to_csv("{}y_predict.csv".format(data_folder), index=True, header=True)
 			y_test.to_csv("{}y_test.csv".format(data_folder), index=True, header=True)
 			
+			# Calculate R2 score and print
 			score = r2_score(y_test, y_predict)
 			print("R2 = {}\n".format(score))
 
@@ -123,14 +128,16 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			plt.xlabel('Time (ms)')
 			plt.title('Estimated data for {}'.format(name))
 
+			# Save figure
 			score = round(score, 4)
 			
 			plt.savefig('{}{}_{}.png'.format(data_folder, name, '_'.join(str(score).split('.'))))
 			plt.show()
 	
 	elif type(X) is dict:
-		group_num = np.arange(len(groups))
 
+		# Create leave one group out split
+		group_num = np.arange(len(groups))
 		logo = LeaveOneGroupOut()
 		logo.get_n_splits(groups=group_num)
 
@@ -141,6 +148,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			f.close()
 
 			roc = []
+			# Train on n - 1 groups, test on 1. Repeat for all
 			for train_index, test_index in logo.split(X=X, groups=group_num):
 				cl = RandomForestClassifier(n_estimators=128, n_jobs=-1)
 
@@ -196,6 +204,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 
 		elif mode == 'regression':
 
+			# Allow for different number of estimators depending on task
 			if 'force' in data_folder:
 				n_estimators = 10
 			

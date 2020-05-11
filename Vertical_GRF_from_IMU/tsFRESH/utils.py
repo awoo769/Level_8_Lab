@@ -187,12 +187,12 @@ def get_directory(initial_directory: str, columns: list, est_events: str = False
 	return save_dir
 
 
-def interpolate_data(time: np.ndarray, x: np.ndarray):
+def interpolate_data(time: np.ndarray, x: np.ndarray, frequency: float):
 	from scipy import interpolate
 	import numpy as np
 
 	# Assumes the time array is in SI units
-	ninterpolates_points = int((time[-1] - time[0]) * 1000) + 1
+	ninterpolates_points = int((time[-1] - time[0]) * frequency) + 1
 
 	# Create the new time array for interpolation
 	new_t = np.linspace(time[0], time[-1], ninterpolates_points)
