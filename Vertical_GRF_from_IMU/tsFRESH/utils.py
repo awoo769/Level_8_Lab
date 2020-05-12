@@ -195,7 +195,7 @@ def interpolate_data(time: np.ndarray, x: np.ndarray, frequency: float):
 	ninterpolates_points = int((time[-1] - time[0]) * frequency) + 1
 
 	# Create the new time array for interpolation
-	new_t = np.linspace(time[0], time[-1], ninterpolates_points)
+	new_t = np.linspace(round(time[0],3), round(time[-1],3), ninterpolates_points)
 	reversed_axes = False
 	# x should have shape (n, len(time))
 	try:
@@ -217,7 +217,7 @@ def interpolate_data(time: np.ndarray, x: np.ndarray, frequency: float):
 				except AssertionError:
 					print('Dimensions in time array and data do not align')
 
-	new_x = np.zeros(np.shape(x))
+	new_x = np.zeros((np.shape(x)[0], np.shape(new_t)[0]))
 	i = 0
 	for item in x:
 		tck_x = interpolate.splrep(time, item, s=0)

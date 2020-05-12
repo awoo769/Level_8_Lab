@@ -29,7 +29,7 @@ def selected_columns(columns: list) -> (list, list):
 	return columns, columns_num
 
 
-def create_directories(new_directory: str, est_events: bool):
+def create_directories(new_directory: str, event: str, event_type: str, est_events: bool):
 	import os
 
 	isdir = os.path.isdir
@@ -145,7 +145,7 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 
 	# Create directories for saving
 	new_directory = "{}{}\\".format(data_folder, ("_".join(map(str,columns_num))))
-	save_dir = create_directories(new_directory, est_events)
+	save_dir = create_directories(new_directory, event, event_type, est_events)
 
 	# Attempt to load features from the save directory.
 	try:

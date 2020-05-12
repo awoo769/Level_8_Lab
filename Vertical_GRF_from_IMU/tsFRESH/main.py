@@ -9,7 +9,7 @@ import pandas as pd
 if __name__ == "__main__":
 	
 	# HS or TO
-	events = ['HS', 'TO']
+	events = ['FS', 'FO']
 	event_types = ['time']
 
 	data_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 	start_time = time.time()
 
 	overlap = True
-	'''
+	
 	for columns in columns_entire:
 		for event in events:
 			for event_type in event_types:
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
 	print('Total run time = {}'.format(end_time - start_time))
 	
-	'''
+	
 	cols = [
 		['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r'],
 		['id', 'time', 'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']

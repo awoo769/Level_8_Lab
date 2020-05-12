@@ -52,11 +52,11 @@ def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = F
 	# Time array is the first value in the data
 	time = data[:,0].astype(float) # 1st column
 
-	# Left foot
-	a_l = (data[:,4:6+1].T).astype(float) # [ax, ay, az]
-
 	# Right foot
-	a_r = (data[:,7:9+1].T).astype(float) # [ax, ay, az]
+	a_r = (data[:,4:6+1].T).astype(float) # [ax, ay, az]
+
+	# Left foot
+	a_l = (data[:,7:9+1].T).astype(float) # [ax, ay, az]
 
 	# Flip the x acceleration on the right foot. This will make the coordinate frames mirrored along the sagittal plane
 	a_r[0] = -a_r[0]
