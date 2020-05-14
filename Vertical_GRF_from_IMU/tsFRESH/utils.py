@@ -5,6 +5,52 @@ import os
 import re
 import csv
 
+
+
+def sort_strike_pattern(runner_info: pd.DataFrame) -> (list, list, list, list):
+	runners = runner_info['SubjectIDa']
+
+	foot_strike_pattern_Rs = runner_info['Footstrike_Pattern_ITL_Rs']
+	foot_strike_pattern_Rl = runner_info['Footstrike_Pattern_ITL_Rl']
+
+	# Check that they are equal
+	assert(foot_strike_pattern_Rl.equals(foot_strike_pattern_Rs))
+
+	RFS = []
+	MFS = []
+	FFS = []
+	Mixed = []
+
+	for i in range(runners.size):
+		if foot_strike_pattern_Rs.iloc[i] == 0:
+			RFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 1:
+			MFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 2:
+			FFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 3:
+			Mixed.append(runners.iloc[i])
+	
+	return RFS, MFS, FFS, Mixed
+
+
+def get_runner_info(directory: str) -> pd.DataFrame:
+	'''
+	This function opens the subject infomation excel workbook and saves it to a numpy array
+
+	08/05/2020
+	Alex Woodall
+
+	'''
+
+	import pandas as pd
+
+	xls = pd.ExcelFile(directory)
+	df = pd.read_excel(xls, 'Sheet1')
+
+	return df
+
+
 def read_csv(filename: str):
 	'''
 	This function opens and reads a csv file, returning a numpy array (data) of the contents.

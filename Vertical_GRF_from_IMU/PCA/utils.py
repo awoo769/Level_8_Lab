@@ -1,29 +1,111 @@
 import numpy as np
+import pandas as pd
+import csv
 
 def read_csv(filename: str):
+
 	'''
 	This function opens and reads a csv file, returning a numpy array (data) of the contents.
 
 	'''
 
-	import csv
 	import numpy as np
+	array = np.array
+	linspace = np.linspace
 
 	with open(filename, 'r') as csvfile:
 		reader = csv.reader(csvfile, delimiter=',')
 
-		data = []
+		GRF_time = []
+		IMU_time = []
+
+		GRF_data = []
+		IMU_data = []
 		i = 0
 		
-		for row in reader:
-			i += 1
+		freq = False
+		meta = False
+		create_time = False
 
-			# First data row on line 8
-			if i >= 8:
-				if len(row) != 0:
+		# Start with GRF data
+		data = GRF_data
+		time = GRF_time
+		for row in reader:
+
+			if len(row) == 0:
+				if create_time == True:
+					start_time = 0
+					end_time = len(data) / frequency
+
+					ninterpolates_points = len(data)
+
+					# Create the new time array for interpolation
+					time.append(list(linspace(start_time, end_time, ninterpolates_points, False)))
+
+
+				data = IMU_data
+				time = IMU_time
+
+			elif meta:
+				# Three rows of meta data
+				i += 1
+
+				try:
+					GRF_start = row.index('Combined Force')
+				except ValueError: # Not in list
+					pass
+
+				try:
+					R_IMU_start = row.index('R_IMU - accel')
+					L_IMU_start = row.index('L_IMU - accel')
+				except ValueError: # Not in list
+					try:
+						R_IMU_start = row.index('IMU_R - accel')
+						L_IMU_start = row.index('IMU_L - accel')
+					except ValueError:
+						try:
+							R_IMU_start = row.index('Imported Vicon IMeasureU 1.0 #1 - accel')
+							L_IMU_start = row.index('Imported Vicon IMeasureU 1.0 #2 - accel')
+						except ValueError:
+							pass
+
+				if i == 3:
+					meta = False
+					create_time = True
+					i = 0
+
+			elif freq:
+				frequency = int(row[0])
+
+				freq = False
+				meta = True
+
+			elif len(row) != 0 and 'Devices' in row[0]:
+				freq = True
+
+			elif len(row) != 0 and freq == False and meta == False:
+				if len(row) > 1:
 					data.append(row)
 
-	return np.array(data)
+	# Convert to numpy arrays
+	GRF_data = array(GRF_data)
+	GRF_time = array(GRF_time).T
+
+	IMU_data = array(IMU_data)
+	IMU_time = array(IMU_time).T
+
+	GRF_data_temp = GRF_data
+
+	# Only use the combined force arrays
+	if len(IMU_time) == 0:
+		GRF_data = np.hstack((GRF_time, GRF_data_temp[:,GRF_start:GRF_start+3].astype(float)))
+		IMU_data = np.hstack((GRF_time, GRF_data_temp[:,R_IMU_start:R_IMU_start+3].astype(float), GRF_data_temp[:,L_IMU_start:L_IMU_start+3].astype(float)))
+	
+	else:
+		GRF_data = np.hstack((GRF_time, GRF_data_temp[:,GRF_start:GRF_start+3].astype(float)))
+		IMU_data = np.hstack((IMU_time, IMU_data[:,R_IMU_start:R_IMU_start+3].astype(float), IMU_data[:,L_IMU_start:L_IMU_start+3].astype(float)))
+
+	return GRF_data, IMU_data
 
 
 def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
@@ -193,223 +275,87 @@ def get_directory(initial_directory: str, columns: list, est_events: str = False
 	return save_dir
 
 
-def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = False) -> (np.ndarray, np.ndarray, np.ndarray):
-	'''
-	This function creates the dataset of events in which features will be extracted from
-
-	data: the data which will be split into samples of length sample_length
-	dataset: the array which is being build of the samples from each trial
-	HS_TO: a list of the truth values of the FS and FO events
-	f: the name of the trial
-	overlap: whether to overlap each sample by half
-
-	'''
-
-	import os
+def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray):
+	
 	from scipy import signal
-	import numpy as np
+	from utils import interpolate_data, rezero_filter
 
-	time = data[:,0].astype(np.float) # 1st column
+	butter = signal.butter
+	filtfilt = signal.filtfilt
 
-	# Left foot
-	a_l = (data[:,4:6+1].T).astype(np.float) # [ax, ay, az]
+	# Frequency to interpolate data to
+	analog_frequency = 1000
 
-	# Right foot
-	a_r = (data[:,7:9+1].T).astype(np.float) # [ax, ay, az]
+	# Convert data to the correct shape
+	if int(GRF_data.shape[1] > GRF_data.shape[0]) == 0:
+		GRF_data = GRF_data.T
+		IMU_data = IMU_data.T
 
-	# Flip the x acceleration on the right foot. This will make the coordinate frames mirrored along the sagittal plane
-	a_r[0] = -a_r[0]
+	# Filter data before interpolation
+	F = GRF_data[1:,:]
+	GRF_time = GRF_data[0,:]
 
-	# Engineered timeseries
-	a_diff = abs(a_l - a_r) # Difference between left and right
-	a_res_l = np.linalg.norm(a_l, axis=0) # Left resultant
-	a_res_r = np.linalg.norm(a_r, axis=0) # Right resultant
-	a_res_diff = abs(a_res_l - a_res_r) # Difference between left and right resultant
-
-	# Get force plate data for comparison
-	F = (data[:,1:3+1].T).astype(np.float) #[Fx, Fy, Fz]; Fz = vertical
-
-	# Rotate 180 deg around y axis (inverse Fx and Fz)
+	# Rotate 180 deg around y axis (inverse Fx and Fz) - assuming that z is facing down
 	F[0] = -F[0] # Fx
 	F[2] = -F[2] # Fz
 
 	''' Filter force plate data at 60 Hz '''
-	analog_frequency = 1000
 	cut_off = 60 # Derie (2017), Robberechts et al (2019)
 	order = 2 # Weyand (2017), Robberechts et al (2019)
-	b_f, a_f = signal.butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
+	b, a = butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
 
-	new_F = np.zeros(np.shape(F))
-
-	for i in range(len(F)):
-		new_F[i,:] = signal.filtfilt(b_f, a_f, F[i,:])
+	new_F = filtfilt(b, a, F, axis=1)
 
 	''' Rezero filtered forces'''
-	threshold = 20 # 20 N
+	threshold = 25 # 20 N
 	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
-	
-	for i in range(len(F)): # Fx, Fy, Fz
-		new_F[i,:] = filter_plate * new_F[i,:]
-	
+
+	# Re-zero the filtered GRFs
+	new_F = new_F * filter_plate
+
+	# Interpolate GRF
+	time, new_F = interpolate_data(GRF_time, new_F, analog_frequency)
+
+	# Re-zero after interpolating
+	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
+	new_F = new_F * filter_plate
+
+	# Re-pack the GRF data
+	GRF_data = np.vstack((time, new_F))
+
 	''' Ground truth event timings '''
-	# Get the points where there is force applied to the force plate (stance phase). Beginning = heel strike, end = toe off
-	heel_strike = []
-	toe_off = []
+	# Get the points where there is force applied to the force plate (stance phase). Beginning = foot strike, end = foot off
+	foot_strike = []
+	foot_off = []
 
+	# Use the vertical GRF, but any GRF would produce the same result
 	for i in range(1, len(new_F[2])-1):
+		# FS
 		if (new_F[2])[i-1] == 0 and (new_F[2])[i] != 0:
-			heel_strike.append(i-1)
+			foot_strike.append(i-1)
 		
+		# FO
 		if (new_F[2])[i+1] == 0 and (new_F[2])[i] != 0:
-			toe_off.append(i+1)
+			foot_off.append(i+1)
 
-	# We now need to split each into individual samples of length sample_length ms (needs to be the
-	# same size for ML). For the final timesteps that remain, add 0's to the end of HS_TO and 
-	# continue with what the acceleration values are.
 
-	# Initial time
-	t = -np.Inf
+	# Filter and interpolate acceleration data
+	''' Filter acceleration data at 0.8 Hz and 45 Hz (band-pass) '''
+	cut_off_l = 0.8 # Derie (2017), Robberechts et al (2019)
+	cut_off_h = 45 # Derie (2017), Robberechts et al (2019)
+	order = 2 # Weyand (2017), Robberechts et al (2019)
+	b, a = signal.butter(N=order, Wn=[cut_off_l/(analog_frequency/2), cut_off_h/(analog_frequency/2)], btype='band')
 
-	# Initial start and end periodss
-	start_period = 0
-	end_period = start_period + sample_length
+	IMU = IMU_data[1:,:]
+	IMU_time = IMU_data[0,:]
 
-	# Convert heel strike and toe off lists to arrays
-	HS = np.array(heel_strike)
-	TO = np.array(toe_off)
+	new_IMU = filtfilt(b, a, IMU, axis=1)
+	time, new_IMU = interpolate_data(IMU_time, new_IMU, analog_frequency)
 
-	# Unique id
-	uid = 0
-	
-	# Temporary data lists
-	acc_temp = []
-	force_temp = []
+	# Re-pack the GRF data
+	IMU_data = np.vstack((time, new_IMU))
 
-	while t < time[-1]:
-
-		# Append heel strikes and toe offs which are within the range
-		sample_HS = np.intersect1d(HS[HS < end_period], HS[HS >= start_period])
-
-		# Convert into new timeframe
-		sample_HS = sample_HS - start_period
-
-		sample_TO = np.intersect1d(TO[TO < end_period], TO[TO >= start_period])
-		
-		# Convert into new timeframe
-		sample_TO = sample_TO - start_period
-
-		# HS_TO will have 0's where there is no event and a 1 where there is.
-		# Two columns per trial. 1st = HS, 2nd = TO
-		temp_HS_TO = np.zeros((sample_length, 2))
-		(temp_HS_TO[:,0])[sample_HS] = 1.0
-		(temp_HS_TO[:,1])[sample_TO] = 1.0
-
-		try:
-			HS_TO = np.vstack((HS_TO, temp_HS_TO))
-		except NameError: # HS_TO does not exist
-			HS_TO = temp_HS_TO
-
-		# Append accelerations which are within the range
-
-		acc_temp.append([uid]*sample_length) # Unique id
-		acc_temp.append(time[start_period:end_period]) # time
-
-		for i in range(len(a_l)): # Left foot xyz
-			acc_temp.append((a_l[i])[start_period:end_period])
-		
-		for i in range(len(a_r)): # Right foot xyz
-			acc_temp.append((a_r[i])[start_period:end_period])
-		
-		for i in range(len(a_diff)): # Difference between left and right foot
-			acc_temp.append((a_diff[i])[start_period:end_period])
-		
-		# Resultant accelerations
-		acc_temp.append(a_res_l[start_period:end_period]) # Left foot
-		acc_temp.append(a_res_r[start_period:end_period]) # Right foot
-		acc_temp.append(a_res_diff[start_period:end_period]) # Difference between left and right foot
-
-		for i in range(len(new_F)): # Filtered force plate data
-			force_temp.append((new_F[i])[start_period:end_period])
-		
-		try:
-			force = np.vstack((force, np.array(force_temp).T))
-		except NameError: # force does not exist
-			force = np.array(force_temp).T
-
-		try:
-			accelerations = np.vstack((accelerations, np.array(acc_temp).T))
-		except NameError: # accelerations does not exist
-			accelerations = np.array(acc_temp).T
-
-		# New start and end period for next iteration
-		if overlap:
-			start_period = int(end_period - sample_length / 2)
-		else:
-			start_period = int(end_period)
-		
-		end_period = int(start_period + sample_length)
-		
-		# Update t for loop conditions
-		try:
-			t = time[end_period-1] # Time at the end of the sample (for loop exiting)
-		except IndexError:
-			t = time[-1]
-
-		uid += 1 # Increase uid
-
-		acc_temp = []
-		force_temp = []
-	
-	# For the part of the timeseries which is left over
-	final_sample_length = len(a_diff[0]) - start_period
-
-	# Append heel strikes and toe offs which are within the range
-	sample_HS = HS[HS >= start_period]
-
-	# Convert into new timeframe
-	sample_HS = sample_HS - start_period
-
-	sample_TO = TO[TO >= start_period]
-	
-	# Convert into new timeframe
-	sample_TO = sample_TO - start_period
-
-	# HS_TO will have 0's where there is no event and a 1 where there is.
-	# Two columns per trial. 1st = HS, 2nd = TO
-	temp_HS_TO = np.zeros((final_sample_length, 2))
-	(temp_HS_TO[:,0])[sample_HS] = 1.0
-	(temp_HS_TO[:,1])[sample_TO] = 1.0
-
-	HS_TO = np.vstack((HS_TO, temp_HS_TO))
-
-	# Append accelerations which are within the range
-	acc_temp.append([uid]*final_sample_length)
-	acc_temp.append(time[start_period:])
-
-	for i in range(len(a_l)): # Left foot xyz
-		acc_temp.append((a_l[i])[start_period:end_period])
-		
-	for i in range(len(a_r)): # Right foot xyz
-		acc_temp.append((a_r[i])[start_period:end_period])
-	
-	for i in range(len(a_diff)): # Difference between left and right foot
-		acc_temp.append((a_diff[i])[start_period:end_period])
-	
-	# Resultant accelerations
-	acc_temp.append(a_res_l[start_period:end_period]) # Left foot
-	acc_temp.append(a_res_r[start_period:end_period]) # Right foot
-	acc_temp.append(a_res_diff[start_period:end_period]) # Difference between left and right foot
-
-	accelerations = np.vstack((accelerations, np.array(acc_temp).T))
-
-	for i in range(len(new_F)):
-		force_temp.append((new_F[i])[start_period:end_period])
-
-	force = np.vstack((force, np.array(force_temp).T))
-	
-	HS_TO = np.array(HS_TO)
-
-	return accelerations, HS_TO, force
+	return GRF_data, IMU_data, foot_strike, foot_off
 
 
 def sort_events(FS: list, FO: list, first_event: str = 'FS', final_event: str = 'FO') -> (list, list):
@@ -661,3 +607,93 @@ def interpolate_acceleration(ninterpolates_points: int = 1000, time: np.ndarray 
 			res = R
 
 	return times, x_a, y_a, z_a, res
+
+
+def interpolate_data(time: np.ndarray, x: np.ndarray, frequency: float):
+	from scipy import interpolate
+	import numpy as np
+
+	# Assumes the time array is in SI units
+	ninterpolates_points = int((time[-1] - time[0]) * frequency) + 1
+
+	# Create the new time array for interpolation
+	new_t = np.linspace(round(time[0],3), round(time[-1],3), ninterpolates_points)
+	reversed_axes = False
+	# x should have shape (n, len(time))
+	try:
+		assert x.shape[1] == len(time)
+	except Exception as e:
+		
+		if isinstance(e, IndexError):
+			# 1 D
+			x = x[np.newaxis,:]
+
+		elif isinstance(e, AssertionError):
+		
+				try:
+					assert x.shape[0] == len(time)
+
+					x = np.swapaxes(x, 1, 0)
+					reversed_axes = True
+
+				except AssertionError:
+					print('Dimensions in time array and data do not align')
+
+	new_x = np.zeros((np.shape(x)[0], np.shape(new_t)[0]))
+	i = 0
+	for item in x:
+		tck_x = interpolate.splrep(time, item, s=0)
+		new_item = interpolate.splev(new_t, tck_x, der=0)
+
+		new_x[i,:] = new_item
+
+		i += 1
+	
+	if reversed_axes:
+		new_x = np.swapaxes(new_x, 1, 0)
+	
+	return new_t, new_x
+
+	
+def sort_strike_pattern(runner_info: pd.DataFrame) -> (list, list, list, list):
+	runners = runner_info['SubjectIDa']
+
+	foot_strike_pattern_Rs = runner_info['Footstrike_Pattern_ITL_Rs']
+	foot_strike_pattern_Rl = runner_info['Footstrike_Pattern_ITL_Rl']
+
+	# Check that they are equal
+	assert(foot_strike_pattern_Rl.equals(foot_strike_pattern_Rs))
+
+	RFS = []
+	MFS = []
+	FFS = []
+	Mixed = []
+
+	for i in range(runners.size):
+		if foot_strike_pattern_Rs.iloc[i] == 0:
+			RFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 1:
+			MFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 2:
+			FFS.append(runners.iloc[i])
+		elif foot_strike_pattern_Rs.iloc[i] == 3:
+			Mixed.append(runners.iloc[i])
+	
+	return RFS, MFS, FFS, Mixed
+
+
+def get_runner_info(directory: str) -> pd.DataFrame:
+	'''
+	This function opens the subject infomation excel workbook and saves it to a numpy array
+
+	08/05/2020
+	Alex Woodall
+
+	'''
+
+	import pandas as pd
+
+	xls = pd.ExcelFile(directory)
+	df = pd.read_excel(xls, 'Sheet1')
+
+	return df

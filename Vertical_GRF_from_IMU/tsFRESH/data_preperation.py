@@ -418,19 +418,30 @@ def get_subject_info(path: str) -> np.array:
 
 def main():
 
-	import glob
+	from glob import glob
 	import numpy as np
 	import pickle
+	import os
+
+	from utils import get_runner_info, sort_strike_pattern
 
 	# Localise functions for speed improvements
 	save = np.save
 	dump = pickle.dump
 
 	# Select path and read all .csv files (these will be the trial data)
-	path = 'C:\\Users\\alexw\\Desktop\\tsFRESH\\Raw Data\\'
-	ext = 'csv'
-	files = glob.glob('{}*.{}'.format(path, ext))
+	file_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\SNRCdat_default\\'
+	info_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\demos.xlsx'
+	ext = '*.csv'
+
+	all_csv_files = [file
+					for path, subdir, files in os.walk(file_path)
+					for file in glob(os.path.join(path, ext))]
 	
+	
+	runner_info = get_runner_info(info_path)
+	RFS, MFS, FFS, Mixed = sort_strike_pattern(runner_info)
+
 	# Length of each sample = 100 ms
 	length = 100
 
