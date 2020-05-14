@@ -31,7 +31,9 @@ for f in all_csv_files:
 
 	GRF_data, IMU_data = read_csv(f)
 
-	f = f.split('.')[0]
+	# Get runners ID
+	f = f.split('\\')[-1]
+	f = f.split('ITL')[0] + 'a'
 
 	GRF_data, IMU_data, FS, FO = prepare_data(GRF_data, IMU_data)
 	
@@ -49,33 +51,53 @@ for f in all_csv_files:
 	res = np.vstack((left_stride['R'], right_stride['R']))
 
 	try:
+		if f in FFS: 
+			res_FFS = np.vstack((res_FFS, res))
+		elif f in RFS:
+			res_RFS = np.vstack((res_RFS, res))
+
 		res_all = np.vstack((res_all, res))
 	
 	except NameError:
+		if f in FFS: 
+			res_FFS = res
+		elif f in RFS:
+			res_RFS = res
+
 		res_all = res
 
-	pca = PCA()
+	pca = PCA(n_components=5)
 
 	pca.fit(res)
-	
-	explained_variance.append(pca.explained_variance_[0])
-	explained_variance_ratio.append(pca.explained_variance_ratio_[0])
 
-	print('Explained variance of first component: {}'.format(explained_variance[-1]))
-	print('Explained variance ratio of first component:: {}'.format(explained_variance_ratio[-1]))
+	explained_variance_ratio = pca.explained_variance_ratio_
 
-	plt.plot(res[0])
+	plt.bar(x = [1, 2, 3, 4, 5], height=explained_variance_ratio)
 	plt.show()
 
-print('Mean explained variance of first component:e: {}'.format(np.mean(explained_variance)))
-print('Mean explained variance ratio of first component:: {}'.format(np.mean(explained_variance_ratio)))
-
+# All strides
 pca = PCA()
-
 pca.fit(res_all)
 
-explained_variance_all = pca.explained_variance_[0]
-explained_variance_ratio_all = pca.explained_variance_ratio_[0]
+explained_variance_ratio = pca.explained_variance_ratio_
 
-print('Explained variance: {}'.format(explained_variance_all))
-print('Explained variance ratio: {}'.format(explained_variance_ratio_all))
+plt.bar(x = [1, 2, 3, 4, 5], height=explained_variance_ratio)
+plt.show()
+
+# Front foot stride
+pca = PCA()
+pca.fit(res_FFS)
+
+explained_variance_ratio = pca.explained_variance_ratio_
+
+plt.bar(x = [1, 2, 3, 4, 5], height=explained_variance_ratio)
+plt.show()
+
+# Rear foot stride
+pca = PCA()
+pca.fit(res_RFS)
+
+explained_variance_ratio = pca.explained_variance_ratio_
+
+plt.bar(x = [1, 2, 3, 4, 5], height=explained_variance_ratio)
+plt.show()
