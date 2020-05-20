@@ -42,30 +42,30 @@ if __name__ == "__main__":
 	start_time = time.time()
 
 	overlap = False
-	'''
-	for columns in columns_entire:
-		for event in events:
-			for event_type in event_types:
-				start_time_i = time.time()
-
-				print("Running using: {} for {} with {}".format(columns, event, event_type))
-
-				extract_data(data_folder=data_folder, columns=columns, all=True, est_events=True, event=event, event_type=event_type, overlap=overlap)
-
-				#directory = get_directory(initial_directory=data_folder, columns=columns, est_events=True, event=event, event_type=event_type)
-
-				# Load features (after extract data has been run)
-				#X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=True, overlap=overlap)
-
-				#learn(X_dictionary, y_dictionary, directory, groups)
-
-				end_time_i = time.time()
-				print('Run time for trial = {}'.format(end_time_i - start_time_i))
 	
+	for columns in columns_entire:
+		#for event in events:
+			#for event_type in event_types:
+		start_time_i = time.time()
+
+		print("Running using: {}".format(columns))
+
+		extract_data(data_folder=data_folder, columns=columns, all=True, est_events=False)#, event=event, event_type=event_type, overlap=overlap)
+
+		#directory = get_directory(initial_directory=data_folder, columns=columns, est_events=True, event=event, event_type=event_type)
+
+		# Load features (after extract data has been run)
+		#X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=True, overlap=overlap)
+
+		#learn(X_dictionary, y_dictionary, directory, groups)
+
+		end_time_i = time.time()
+		print('Run time for trial = {}'.format(end_time_i - start_time_i))
+
 	end_time = time.time()
 
 	print('Total run time = {}'.format(end_time - start_time))
-	'''
+	
 	
 	cols = [
 		['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r'],

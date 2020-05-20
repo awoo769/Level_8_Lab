@@ -134,11 +134,15 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 	import os
 
 	# Load data
-	if overlap:
-		dataset = pickle.load(open(data_folder + "dataset_overlap.pkl", "rb"))
-	
-	else:
-		dataset = pickle.load(open(data_folder + "dataset_no_overlap.pkl", "rb"))
+	try:
+		if overlap:
+			dataset = pickle.load(open(data_folder + "dataset_overlap.pkl", "rb"))
+
+		else:
+			dataset = pickle.load(open(data_folder + "dataset_no_overlap.pkl", "rb"))
+
+	except FileNotFoundError:
+		dataset = pickle.load(open(data_folder + "dataset_200.pkl", "rb"))
 
 	# Number selected columns which the user chose to use for feature extraction
 	columns, columns_num = selected_columns(columns)	
@@ -198,7 +202,7 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 
 		else: # Estimating forces
 			# possible force = ['Fx', 'Fy', 'Fz'] Assuming z direction is vertical
-			y = dataset[key]['force'][:,2]
+			y = dataset[key]['y'][:,2]
 		
 		# Convert to pandas DataFrame/Series
 		if type(timeseries) is np.ndarray:
