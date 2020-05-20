@@ -124,7 +124,7 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 	'''
 
 	from tsfresh import extract_features, extract_relevant_features, select_features
-	from tsfresh.feature_extraction import ComprehensiveFCParameters
+	from tsfresh.feature_extraction import ComprehensiveFCParameters, MinimalFCParameters
 	from tsfresh.feature_extraction.settings import from_columns
 	from tsfresh.utilities.dataframe_functions import impute
 
@@ -248,9 +248,17 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 											column_id="id", column_sort="time",
 											kind_to_fc_parameters=extraction_settings)
 
-			# Add start_time column to dataframe
-			start_time = dataset[key]['X_starting_time']
-			X_filtered.insert(0, "start_time", start_time, True)
+			# Add start_time and mass column to dataframe
+			if est_events:
+				start_time = dataset[key]['X_starting_time']
+				mass = dataset[key]['X_mass_sample']
+
+				X_filtered.insert(0, "start_time", start_time, True)
+				X_filtered.insert(1, "mass", mass, True)
+			
+			else:
+				mass = dataset[key]['X_mass_all']
+				X_filtered.insert(0, "mass", mass, True)
 
 			# Save dataframes
 			X_filtered.to_csv("{}{}_X.csv".format(save_dir, key), index=True, header=True)
@@ -334,13 +342,24 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 			start = end_idx + 1
 			i += 1
 
-			# Add start_time column to dataframe
-			start_time = dataset[key]['X_starting_time']
+			# Add start_time and mass column to dataframe
+			if est_events:
+				start_time = dataset[key]['X_starting_time']
+				mass = dataset[key]['X_mass_sample']
 
-			# Remove indexes of starting time which were removed due to NaN's.
-			start_time_new = start_time[:len(X_save)]
+				# Remove those due to NaN's
+				start_time_new = start_time[:len(X_save)]
+				mass_new = mass[:len(X_save)]
 
-			X_save.insert(0, "start_time", start_time_new, True)
+				X_save.insert(0, "start_time", start_time_new, True)
+				X_save.insert(1, "mass", mass_new, True)
+			
+			else:
+				mass = dataset[key]['X_mass_all']
+
+				# Remove those due to NaN's (should be zero for GRF estimation)
+				mass_new = mass[:len(X_save)]
+				X_save.insert(0, "mass", mass_new, True)
 
 			# Save
 			X_save.to_csv("{}{}_X.csv".format(save_dir, key), index=True, header=True)
@@ -355,10 +374,10 @@ if __name__ == "__main__":
 	event = 'FS'
 	event_type = 'binary'
 
-	data_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
+	data_folder = "C:\\Users\\alexw\\Desktop\\Harvard_data\\"
 
 	# columns in X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
 	# 				'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']
 	columns = ['id', 'time', 'a_res_l', 'a_res_r'] # Columns that we want to use
 
-	extract_data(data_folder=data_folder, columns=columns, all=True, est_events=True, event=event, event_type=event_type)
+	extract_data(data_folder=data_folder, columns=columns, all=True, est_events=False)#, event=event, event_type=event_type)

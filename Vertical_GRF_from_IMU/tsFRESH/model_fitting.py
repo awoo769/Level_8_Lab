@@ -18,7 +18,7 @@ from scipy import signal
 
 from utils import get_directory, load_features, rezero_filter
 
-def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, groups: list, test_split: float = None, name: str = None):
+def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, groups: list = None, test_split: float = None, name: str = None):
 	'''
 	This function trains either a classification or regression random forest model. It is able to handle
 	either a singular pandas DataFrame or a dictionary of pandas DataFrames. If the input is a singular
@@ -34,10 +34,13 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 
 	data_folder: the location of where to save the output
 
+	groups: a list of the trial names
+			NOTE: this is only required if the X/y input is a dictionary
+
 	test_split: the decimal percentage to split the training and testing datasets
 				NOTE: this is only required if the X/y input is not a dictionary
 
-	none: the name of the trial
+	name: the name of the trial
 		  NOTE: this is only required if the X/y input is not a dictionary
 
 	Alex Woodall
@@ -90,7 +93,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			y_test = y.tail(len(X) - split_int)
 
 			# Create regressor and train
-			rg = RandomForestRegressor(n_estimators=20, n_jobs=-1)
+			rg = RandomForestRegressor(n_estimators=100, n_jobs=-1)
 			rg.fit(X_train, y_train)
 
 			# Predict
@@ -106,7 +109,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 			new_F = signal.filtfilt(b_f, a_f, y_predict)
 
 			''' Rezero filtered forces'''
-			threshold = 20 # 20 N
+			threshold = 50 # 20 N
 			filter_plate = rezero_filter(original_fz=new_F, threshold=threshold)
 			
 			y_predict = filter_plate * new_F
@@ -284,7 +287,7 @@ def learn(X: (dict, pd.DataFrame), y: (dict, pd.Series), data_folder: str, group
 
 if __name__ == "__main__":
 	
-	data_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
+	data_folder = "C:\\Users\\alexw\\Desktop\\Harvard_data\\"
 	event = 'HS'
 
 	# columns in X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
@@ -292,14 +295,15 @@ if __name__ == "__main__":
 	columns = ['id', 'time', 'a_res_l', 'a_res_r']
 	#columns = ['id', 'time', 'ax_diff', 'ay_diff', 'az_diff', 'a_res_diff'] # Columns that we want to use
 
-	directory = get_directory(initial_directory=data_folder, columns=columns, est_events=True, event=event)
+	directory = get_directory(initial_directory=data_folder, columns=columns, est_events=False)#, event=event)
 
 	# Load features (after extract data has been run)
-	X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=True)
+	X_dictionary, y_dictionary, groups = load_features(data_folder, directory, est_events=False)
 
-	i = 6
+	i = 0
 	X = X_dictionary[groups[i]]
 	y = y_dictionary[groups[i]]
 
 	test_split = 0.33
+	#learn(X, y, directory, test_split=test_split)
 	learn(X_dictionary, y_dictionary, directory, groups)

@@ -12,7 +12,7 @@ if __name__ == "__main__":
 	events = ['FS', 'FO']
 	event_types = ['time']
 
-	data_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
+	data_folder = "C:\\Users\\alexw\\Desktop\\Harvard_data\\"
 	
 	# columns in X = ['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r',
 	# 				'ax_diff', 'ay_diff', 'az_diff', 'a_res_l', 'a_res_r', 'a_res_diff']
@@ -41,8 +41,8 @@ if __name__ == "__main__":
 
 	start_time = time.time()
 
-	overlap = True
-	
+	overlap = False
+	'''
 	for columns in columns_entire:
 		for event in events:
 			for event_type in event_types:
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 	end_time = time.time()
 
 	print('Total run time = {}'.format(end_time - start_time))
-	
+	'''
 	
 	cols = [
 		['id', 'time', 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r'],
@@ -75,6 +75,10 @@ if __name__ == "__main__":
 
 	# Columns that we want to train on
 	cols = [ 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r', 'a_res_l', 'a_res_r']
+	cols = [ 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r']
+	cols = ['ax_diff', 'ay_diff', 'az_diff']
+	cols = ['ax_diff', 'ay_diff', 'az_diff','a_res_diff']
+	cols = [ 'ax_l', 'ay_l', 'az_l', 'ax_r', 'ay_r', 'az_r', 'ax_diff', 'ay_diff', 'az_diff']
 
 	for event in events:
 			for event_type in event_types:

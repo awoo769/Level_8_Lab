@@ -20,13 +20,14 @@ Alex Woodall
 # For input type purposes
 import numpy as np
 
-def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int, overlap: bool = False) -> (np.ndarray, np.ndarray, np.ndarray):
+def prepare_data(data: np.ndarray, sample_length: int, f: str, overlap: bool = False) -> (np.ndarray, np.ndarray, np.ndarray):
 	'''
 	This function creates the dataset of events in which features will be extracted from
 
 	data: the data which will be split into samples of length sample_length
 	dataset: the array which is being build of the samples from each trial
 	HS_TO: a list of the truth values of the FS and FO events
+	f: the name of the trial
 	overlap: whether to overlap each sample by half
 
 	returns three numpy arrays: acceleration, force and event
@@ -36,30 +37,44 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int,
 	from scipy import signal
 	import numpy as np
 
-	from utils import interpolate_data, rezero_filter
-
+	from utils import interpolate_data, read_csv, rezero_filter
 
 	# Localise functions for speed improvements
 	zeros = np.zeros
 	normal = np.linalg.norm
+	butter = signal.butter
+	filtfilt = signal.filtfilt
 	array = np.array
 	Inf = np.Inf
 	intersect1d = np.intersect1d
 	vstack = np.vstack
 
-	butter = signal.butter
-	filtfilt = signal.filtfilt
+	# Time array is the first value in the data
+	time = data[:,0].astype(float) # 1st column
 
-	# Frequency to interpolate data to
+	# Right foot
+	a_r = (data[:,4:6+1].T).astype(float) # [ax, ay, az]
+
+	# Left foot
+	a_l = (data[:,7:9+1].T).astype(float) # [ax, ay, az]
+
+	# Flip the x acceleration on the right foot. This will make the coordinate frames mirrored along the sagittal plane
+	a_r[0] = -a_r[0]
+
+	# Interpolate acceleration data to ensure that is it at 1000 Hz
 	analog_frequency = 1000
+	_, a_l = interpolate_data(time, a_l, analog_frequency)
+	_, a_r = interpolate_data(time, a_r, analog_frequency)
 
-	# Convert data to the correct shape
-	if int(GRF_data.shape[1] > GRF_data.shape[0]) == 0:
-		GRF_data = GRF_data.T
-		IMU_data = IMU_data.T
+	# Engineered timeseries
+	a_diff = abs(a_l - a_r) # Difference between left and right
+	a_res_l = normal(a_l, axis=0) # Left resultant
+	a_res_r = normal(a_r, axis=0) # Right resultant
+	a_res_diff = abs(a_res_l - a_res_r) # Difference between left and right resultant
 
-	F = GRF_data[1:,:]
-	GRF_time = GRF_data[0,:]
+	# Get force plate data for comparison
+	F = (data[:,1:3+1].T).astype(float) #[Fx, Fy, Fz]; Fz = vertical
+	time, F = interpolate_data(time, F, analog_frequency)
 
 	# Rotate 180 deg around y axis (inverse Fx and Fz) - assuming that z is facing down
 	F[0] = -F[0] # Fx
@@ -68,24 +83,17 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int,
 	''' Filter force plate data at 60 Hz '''
 	cut_off = 60 # Derie (2017), Robberechts et al (2019)
 	order = 2 # Weyand (2017), Robberechts et al (2019)
-	b, a = butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
+	b_f, a_f = butter(N=order, Wn=cut_off/(analog_frequency/2), btype='low')
 
-	new_F = filtfilt(b, a, F, axis=1)
+	new_F = filtfilt(b_f, a_f, F, axis=1)
 
-	''' Rezero filtered forces '''
-	threshold = 50 # 60 N
+	''' Rezero filtered forces'''
+	threshold = 20 # 20 N
 	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
-
+	
 	# Re-zero the filtered GRFs
 	new_F = new_F * filter_plate
-
-	# Interpolate GRF
-	time, new_F = interpolate_data(GRF_time, new_F, analog_frequency)
-
-	# Re-zero after interpolating
-	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
-	new_F = new_F * filter_plate
-
+	
 	''' Ground truth event timings '''
 	# Get the points where there is force applied to the force plate (stance phase). Beginning = foot strike, end = foot off
 	foot_strike = []
@@ -100,29 +108,6 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int,
 		# FO
 		if (new_F[2])[i+1] == 0 and (new_F[2])[i] != 0:
 			foot_off.append(i+1)
-
-	# Filter and interpolate acceleration data
-	''' Filter acceleration data at 0.8 Hz and 45 Hz (band-pass) '''
-	cut_off_l = 0.8 # Derie (2017), Robberechts et al (2019)
-	cut_off_h = 45 # Derie (2017), Robberechts et al (2019)
-	order = 2 # Weyand (2017), Robberechts et al (2019)
-	b, a = signal.butter(N=order, Wn=[cut_off_l/(analog_frequency/2), cut_off_h/(analog_frequency/2)], btype='band')
-
-	IMU = IMU_data[1:,:]
-	IMU_time = IMU_data[0,:]
-
-	new_IMU = filtfilt(b, a, IMU, axis=1)
-	time, new_IMU = interpolate_data(IMU_time, new_IMU, analog_frequency)
-
-	a_r = new_IMU[:3]
-	a_l = new_IMU[3:] 
-
-	# Engineered timeseries
-	a_diff = abs(a_l - a_r) # Difference between left and right
-	a_res_l = normal(a_l, axis=0) # Left resultant
-	a_res_r = normal(a_r, axis=0) # Right resultant
-	a_res_diff = abs(a_res_l - a_res_r) # Difference between left and right resultant
-
 
 	# We now need to split each into individual samples of length sample_length.
 	# Because the data is sampled at 1000 Hz, 1 indice = 1 ms.
@@ -287,7 +272,7 @@ def create_dataset(dataset_dict: dict, sample_length: int, f: str, overlap: bool
 	import numpy as np
 
 	# Import required functions
-	from utils import read_csv, get_runner_info
+	from utils import read_csv
 
 	# Localise functions for speed improvements
 	zeros = np.zeros
@@ -297,10 +282,15 @@ def create_dataset(dataset_dict: dict, sample_length: int, f: str, overlap: bool
 	isnan = np.isnan
 
 	# Load the data
-	GRF_data, IMU_data = read_csv(f)
+	data = read_csv(f)
+
+	# Get the name of the trial and use it as the dictionary key
+	f = f.split('.')[0]
+	f = f.split('\\')[-1]
+	dataset_dict[f] = {}
 
 	# Sort the data into samples and pre-process data for analysis
-	X, y, force = prepare_data(GRF_data=GRF_data, IMU_data=IMU_data, sample_length=sample_length, overlap=overlap)
+	X, y, force = prepare_data(data=data, sample_length=sample_length, f=f, overlap=overlap)
 
 	# Get number of samples
 	uids = list(set(X[:,0]))
@@ -372,39 +362,58 @@ def create_dataset(dataset_dict: dict, sample_length: int, f: str, overlap: bool
 	HS_time_to_next = np.array(HS_time_to_next)
 	TO_time_to_next = np.array(TO_time_to_next)
 
-	# Get the name of the trial and use it as the dictionary key
-	ID = f.split('.')[0]
-	ID = ID.split('\\')[-1]
+	# Save to the dataset dictionary
+	dataset_dict[f]['X'] = X
+	dataset_dict[f]['X_starting_time'] = X_starting_time
 
-	# Get mass of trial
-	runner_ID = ID.split('ITL')[0] + 'a'
-	info = get_runner_info('C:\\Users\\alexw\\Dropbox\\auckIMU\\demos.xlsx')
+	dataset_dict[f]['y_FS_binary'] = HS_binary
+	dataset_dict[f]['y_FO_binary'] = TO_binary
+	dataset_dict[f]['y_FS_time_to'] = HS_time_to
+	dataset_dict[f]['y_FO_time_to'] = TO_time_to
+	dataset_dict[f]['y_FS_time_to_next'] = HS_time_to_next
+	dataset_dict[f]['y_FO_time_to_next'] = TO_time_to_next
 
-	iloc = np.where(info['Subject_ID'] == runner_ID)[0][0]
-	mass = float(info['Mass'].iloc[iloc])
-
-	mass_all = [mass] * len(X)
-	mass_sample = [mass] * len(X_starting_time)
-
-	if not isnan(mass):
-		dataset_dict[ID] = {}
-
-		# Save to the dataset dictionary
-		dataset_dict[ID]['X'] = X
-		dataset_dict[ID]['X_starting_time'] = X_starting_time
-		dataset_dict[ID]['X_mass_all'] = mass_all
-		dataset_dict[ID]['X_mass_sample'] = mass_sample
-
-		dataset_dict[ID]['y_FS_binary'] = HS_binary
-		dataset_dict[ID]['y_FO_binary'] = TO_binary
-		dataset_dict[ID]['y_FS_time_to'] = HS_time_to
-		dataset_dict[ID]['y_FO_time_to'] = TO_time_to
-		dataset_dict[ID]['y_FS_time_to_next'] = HS_time_to_next
-		dataset_dict[ID]['y_FO_time_to_next'] = TO_time_to_next
-
-		dataset_dict[ID]['force'] = force
+	dataset_dict[f]['force'] = force
 
 	return dataset_dict
+
+
+def get_subject_info(path: str) -> np.array:
+	'''
+	This function opens the subject infomation excel workbook and saves it to a numpy array
+
+	08/05/2020
+	Alex Woodall
+
+	'''
+
+	import openpyxl
+	from pathlib import Path
+	import numpy as np
+
+	# Localise functions for speed improvements
+	array = np.array
+
+	# Open excel file
+	xlsx_file = Path(path, 'Subject details.xlsx')
+	wb_obj = openpyxl.load_workbook(xlsx_file)
+	sheet = wb_obj.active
+
+	subject_information = []
+
+	# Extract subject infomation
+	for row in sheet.iter_rows():
+		temp_info = []
+
+		for cell in row:
+			temp_info.append(cell.value)
+		
+		# List of subject information: ID, Gender, Height, Weight
+		subject_information.append(temp_info)
+
+	subject_information = array(subject_information)
+
+	return subject_information
 
 
 def main():
@@ -417,6 +426,7 @@ def main():
 	from utils import get_runner_info, sort_strike_pattern
 
 	# Localise functions for speed improvements
+	save = np.save
 	dump = pickle.dump
 
 	# Select path and read all .csv files (these will be the trial data)
@@ -428,23 +438,7 @@ def main():
 					for path, subdir, files in os.walk(file_path)
 					for file in glob(os.path.join(path, ext))]
 	
-	# If there is an 02, 03... etc, then don't use the 01 (or versions previous) (something may have gone wrong)
-	prev = ''
-	remove_index = []
-	for i in range(len(all_csv_files)):
-		cur = all_csv_files[i]
-
-		if cur[:-6] == prev[:-6]:
-			# Remove previous
-			remove_index.append(i-1)
-		prev = cur
-
-	i = 0
-	for element in remove_index:
-		all_csv_files.pop(element - i)
-
-		i += 1
-		
+	
 	runner_info = get_runner_info(info_path)
 	RFS, MFS, FFS, Mixed = sort_strike_pattern(runner_info)
 
@@ -454,19 +448,15 @@ def main():
 	# Dictionary to hold trial data and truth solutions
 	dataset = {}
 
-	overlap = True
+	overlap = False
 
-	for f in all_csv_files:
-		# Get runners ID
-		ID = f.split('\\')[-1]
-		ID = ID.split('ITL')[0] + 'a'
+	for f in files:
+		print('Running file: ' + str(f))
 
-		if ID in RFS:
-			print('Running file: ' + str(f))
-			dataset = create_dataset(dataset, length, f, overlap)
+		dataset = create_dataset(dataset, length, f, overlap)
 
 	# Save dataset
-	dataset_folder = "C:\\Users\\alexw\\Desktop\\Harvard_data\\"
+	dataset_folder = "C:\\Users\\alexw\\Desktop\\tsFRESH\\data\\"
 
 	if overlap:
 		f = open(dataset_folder + "dataset_overlap.pkl", "wb")
@@ -474,6 +464,10 @@ def main():
 		f = open(dataset_folder + "dataset_no_overlap.pkl", "wb")
 	dump(dataset, f)
 	f.close()
+
+	# Get subject information and save
+	subject_information = get_subject_info(path)
+	save(dataset_folder + "subject_information.npy", subject_information)
 
 
 if __name__ == '__main__':

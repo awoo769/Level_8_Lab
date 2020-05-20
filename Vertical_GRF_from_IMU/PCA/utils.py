@@ -275,7 +275,7 @@ def get_directory(initial_directory: str, columns: list, est_events: str = False
 	return save_dir
 
 
-def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray):
+def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray) -> (np.ndarray, np.ndarray, list, list):
 	
 	from scipy import signal
 	from utils import interpolate_data, rezero_filter
@@ -291,7 +291,6 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray) -> (np.ndarray, np.
 		GRF_data = GRF_data.T
 		IMU_data = IMU_data.T
 
-	# Filter data before interpolation
 	F = GRF_data[1:,:]
 	GRF_time = GRF_data[0,:]
 
@@ -306,8 +305,8 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray) -> (np.ndarray, np.
 
 	new_F = filtfilt(b, a, F, axis=1)
 
-	''' Rezero filtered forces'''
-	threshold = 25 # 20 N
+	''' Rezero filtered forces '''
+	threshold = 50 # 60 N
 	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
 
 	# Re-zero the filtered GRFs
@@ -428,10 +427,24 @@ def filter_acceleration(acc: np.ndarray) -> np.ndarray:
 	return a_filt
 
 
-def allocate_events(time: np.ndarray, a_left: np.ndarray, a_right: np.ndarray, FS: list, FO: list):
+def phase_split(time: np.ndarray, a_left: np.ndarray, a_right: np.ndarray, FS: list, FO: list, phase: str = 'Stance'):
+	
+	# Possible phases
+	# Stride, stance, swing
+	
 	import numpy as np
-	# Make sure that the first and last event is a FS
-	FS, FO = sort_events(FS, FO, first_event='FS', final_event='FS')
+
+	if phase == 'stride':
+		# Make sure that the first and last event is a FS
+		FS, FO = sort_events(FS, FO, first_event='FS', final_event='FS')
+	
+	elif phase == 'stance':
+		# Make sure that the first event is FS and the last event is a FO
+		FS, FO = sort_events(FS, FO, first_event='FS', final_event='FO')
+
+	elif phase == 'swing':
+		# Make sure that the first event is FO and the last event is a FS
+		FS, FO = sort_events(FS, FO, first_event='FO', final_event='FS')
 
 	FS_1 = FS[::2]
 	FS_2 = FS[1::2]
@@ -656,13 +669,10 @@ def interpolate_data(time: np.ndarray, x: np.ndarray, frequency: float):
 
 	
 def sort_strike_pattern(runner_info: pd.DataFrame) -> (list, list, list, list):
-	runners = runner_info['SubjectIDa']
+	runners = runner_info['Subject_ID']
 
 	foot_strike_pattern_Rs = runner_info['Footstrike_Pattern_ITL_Rs']
 	foot_strike_pattern_Rl = runner_info['Footstrike_Pattern_ITL_Rl']
-
-	# Check that they are equal
-	assert(foot_strike_pattern_Rl.equals(foot_strike_pattern_Rs))
 
 	RFS = []
 	MFS = []

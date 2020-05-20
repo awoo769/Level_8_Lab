@@ -8,13 +8,10 @@ import csv
 
 
 def sort_strike_pattern(runner_info: pd.DataFrame) -> (list, list, list, list):
-	runners = runner_info['SubjectIDa']
+	runners = runner_info['Subject_ID']
 
 	foot_strike_pattern_Rs = runner_info['Footstrike_Pattern_ITL_Rs']
 	foot_strike_pattern_Rl = runner_info['Footstrike_Pattern_ITL_Rl']
-
-	# Check that they are equal
-	assert(foot_strike_pattern_Rl.equals(foot_strike_pattern_Rs))
 
 	RFS = []
 	MFS = []
@@ -52,6 +49,112 @@ def get_runner_info(directory: str) -> pd.DataFrame:
 
 
 def read_csv(filename: str):
+
+	'''
+	This function opens and reads a csv file, returning a numpy array (data) of the contents.
+
+	'''
+
+	import numpy as np
+	array = np.array
+	linspace = np.linspace
+
+	with open(filename, 'r') as csvfile:
+		reader = csv.reader(csvfile, delimiter=',')
+
+		GRF_time = []
+		IMU_time = []
+
+		GRF_data = []
+		IMU_data = []
+		i = 0
+		
+		freq = False
+		meta = False
+		create_time = False
+
+		# Start with GRF data
+		data = GRF_data
+		time = GRF_time
+		for row in reader:
+
+			if len(row) == 0:
+				if create_time == True:
+					start_time = 0
+					end_time = len(data) / frequency
+
+					ninterpolates_points = len(data)
+
+					# Create the new time array for interpolation
+					time.append(list(linspace(start_time, end_time, ninterpolates_points, False)))
+
+
+				data = IMU_data
+				time = IMU_time
+
+			elif meta:
+				# Three rows of meta data
+				i += 1
+
+				try:
+					GRF_start = row.index('Combined Force')
+				except ValueError: # Not in list
+					pass
+
+				try:
+					R_IMU_start = row.index('R_IMU - accel')
+					L_IMU_start = row.index('L_IMU - accel')
+				except ValueError: # Not in list
+					try:
+						R_IMU_start = row.index('IMU_R - accel')
+						L_IMU_start = row.index('IMU_L - accel')
+					except ValueError:
+						try:
+							R_IMU_start = row.index('Imported Vicon IMeasureU 1.0 #1 - accel')
+							L_IMU_start = row.index('Imported Vicon IMeasureU 1.0 #2 - accel')
+						except ValueError:
+							pass
+
+				if i == 3:
+					meta = False
+					create_time = True
+					i = 0
+
+			elif freq:
+				frequency = int(row[0])
+
+				freq = False
+				meta = True
+
+			elif len(row) != 0 and 'Devices' in row[0]:
+				freq = True
+
+			elif len(row) != 0 and freq == False and meta == False:
+				if len(row) > 1:
+					data.append(row)
+
+	# Convert to numpy arrays
+	GRF_data = array(GRF_data)
+	GRF_time = array(GRF_time).T
+
+	IMU_data = array(IMU_data)
+	IMU_time = array(IMU_time).T
+
+	GRF_data_temp = GRF_data
+
+	# Only use the combined force arrays
+	if len(IMU_time) == 0:
+		GRF_data = np.hstack((GRF_time, GRF_data_temp[:,GRF_start:GRF_start+3].astype(float)))
+		IMU_data = np.hstack((GRF_time, GRF_data_temp[:,R_IMU_start:R_IMU_start+3].astype(float), GRF_data_temp[:,L_IMU_start:L_IMU_start+3].astype(float)))
+	
+	else:
+		GRF_data = np.hstack((GRF_time, GRF_data_temp[:,GRF_start:GRF_start+3].astype(float)))
+		IMU_data = np.hstack((IMU_time, IMU_data[:,R_IMU_start:R_IMU_start+3].astype(float), IMU_data[:,L_IMU_start:L_IMU_start+3].astype(float)))
+
+	return GRF_data, IMU_data
+
+
+def read_csv_AUT(filename: str):
 	'''
 	This function opens and reads a csv file, returning a numpy array (data) of the contents.
 
