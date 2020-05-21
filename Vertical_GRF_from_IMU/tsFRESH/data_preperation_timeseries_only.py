@@ -40,13 +40,7 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int)
 
 
 	# Localise functions for speed improvements
-	zeros = np.zeros
 	normal = np.linalg.norm
-	array = np.array
-	Inf = np.Inf
-	intersect1d = np.intersect1d
-	vstack = np.vstack
-
 	butter = signal.butter
 	filtfilt = signal.filtfilt
 
@@ -75,17 +69,26 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int)
 
 	''' Rezero filtered forces '''
 	threshold = 50 # 60 N
-	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
+	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold, frequency=analog_frequency)
 
 	# Re-zero the filtered GRFs
 	new_F = new_F * filter_plate
+	new_F[new_F < 0] = 0
+
+	from matplotlib import pyplot as plt
+	plt.plot(new_F[2])
+	plt.show()
 
 	# Interpolate GRF
 	time, new_F = interpolate_data(GRF_time, new_F, interpolate_frequency)
 
 	# Re-zero after interpolating
-	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold)
+	filter_plate = rezero_filter(original_fz=new_F[2], threshold=threshold, frequency=interpolate_frequency)
 	new_F = new_F * filter_plate
+
+	from matplotlib import pyplot as plt
+	plt.plot(new_F[2])
+	plt.show()
 
 	# Filter and interpolate acceleration data
 	''' Filter acceleration data at 0.8 Hz and 45 Hz (band-pass) '''
@@ -101,7 +104,11 @@ def prepare_data(GRF_data: np.ndarray, IMU_data: np.ndarray, sample_length: int)
 	time, new_IMU = interpolate_data(IMU_time, new_IMU, interpolate_frequency)
 
 	a_r = new_IMU[:3]
-	a_l = new_IMU[3:] 
+	a_l = new_IMU[3:]
+
+	from matplotlib import pyplot as plt
+	plt.plot(a_r[1])
+	plt.show()
 
 	# Engineered timeseries
 	a_diff = abs(a_l - a_r) # Difference between left and right
@@ -147,7 +154,10 @@ def create_dataset(dataset_dict: dict, sample_length: int, f: str) -> dict:
 	ID = ID.split('\\')[-1]
 
 	# Get mass of trial
-	runner_ID = ID.split('ITL')[0] + 'a'
+	if 'ITL' in ID:
+		runner_ID = ID.split('ITL')[0] + 'a'
+	else:
+		runner_ID = ID[:8]
 	info = get_runner_info('C:\\Users\\alexw\\Dropbox\\auckIMU\\demos.xlsx')
 
 	iloc = np.where(info['Subject_ID'] == runner_ID)[0][0]
@@ -180,7 +190,8 @@ def main():
 	dump = pickle.dump
 
 	# Select path and read all .csv files (these will be the trial data)
-	file_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\SNRCdat_default\\'
+	#file_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\SNRCdat_default\\'
+	file_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\SNRCrcp\\'
 	info_path = 'C:\\Users\\alexw\\Dropbox\\auckIMU\\demos.xlsx'
 	ext = '*.csv'
 
@@ -217,7 +228,10 @@ def main():
 	for f in all_csv_files:
 		# Get runners ID
 		ID = f.split('\\')[-1]
-		ID = ID.split('ITL')[0] + 'a'
+		if 'ITL' in ID:
+			ID = ID.split('ITL')[0] + 'a'
+		else:
+			ID = ID[:8]
 
 		if ID in RFS:
 			print('Running file: ' + str(f))

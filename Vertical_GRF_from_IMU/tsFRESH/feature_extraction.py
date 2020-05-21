@@ -287,20 +287,27 @@ def extract_data(data_folder: str, columns: list, overlap = False, all: bool = T
 		
 		# First remove any NaN values in y, this should only be at the end
 		print('Extracting all features')
-		X = extract_features(timeseries_temp,
-							column_id="id", column_sort="time",
-							default_fc_parameters=ComprehensiveFCParameters(),
-							impute_function=impute)
-		
-		y = y_temp
 
-		# Remove NaN index's from X and y
-		remove_idx = pd.isnull(y.to_numpy()).nonzero()[0]
-		y = y.drop(remove_idx)
-		X = X.drop(remove_idx)
-		
-		print('Selecting relevant features')
-		X_filtered = select_features(X, y)
+		if est_events:
+			X = extract_features(timeseries_temp,
+								column_id="id", column_sort="time",
+								default_fc_parameters=ComprehensiveFCParameters(),
+								impute_function=impute)
+			
+			y = y_temp
+
+			# Remove NaN index's from X and y
+			remove_idx = pd.isnull(y.to_numpy()).nonzero()[0]
+			y = y.drop(remove_idx)
+			X = X.drop(remove_idx)
+			
+			print('Selecting relevant features')
+			X_filtered = select_features(X, y)
+
+		else:
+			X_filtered = extract_relevant_features(timeseries_temp, y_temp,
+								column_id="id", column_sort="time",
+								default_fc_parameters=ComprehensiveFCParameters())
 				
 		X_filtered.to_csv("{}features.csv".format(save_dir), header=True)
 		

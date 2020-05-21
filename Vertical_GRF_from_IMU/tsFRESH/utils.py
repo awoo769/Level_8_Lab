@@ -11,7 +11,6 @@ def sort_strike_pattern(runner_info: pd.DataFrame) -> (list, list, list, list):
 	runners = runner_info['Subject_ID']
 
 	foot_strike_pattern_Rs = runner_info['Footstrike_Pattern_ITL_Rs']
-	foot_strike_pattern_Rl = runner_info['Footstrike_Pattern_ITL_Rl']
 
 	RFS = []
 	MFS = []
@@ -177,11 +176,13 @@ def read_csv_AUT(filename: str):
 	return np.array(data)
 
 
-def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
+def rezero_filter(original_fz: np.ndarray, threshold: int = 20, frequency: int = 1000):
 	'''
 	Resets all values which were originally zero to zero
 
 	Inputs:	original_fy: an array of unfiltered y data
+			threshold: an integer containing the threshold to rezero at
+			frequency: the frequency of the data points
 
 	Outputs:	filter_plate: an array corresponding to a mask. '1' if above a threshold to keep,
 				'0' if below a threshold and will be set to 0
@@ -192,21 +193,24 @@ def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
 
 	filter_plate = np.zeros(np.shape(original_fz))
 
-	# Binary test for values greater than 20
+	# Binary test for values greater than the threshold
 	force_zero = (original_fz > threshold) * 1 # Convert to 1 or 0 rather than True or False
+	force_zero_opposite = (np.invert(force_zero.astype(bool)))
 
-	# We do not want to accept values which are over 20 but considered 'noise'.
-	# Must be over 20 for more than 35 frames in a row. (Robberechts, 2019) Therefore, need to search for
-	# [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] x 3.5 and get all the indices that meet this condition
+	# We do not want to accept values which are over the threshold but considered 'noise'.
+	# Must be over the threshold for more than 35 ms. (Robberechts, 2019) Therefore, need to search for
+	# [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] x 3.5 if frequency is 1000 Hz and get all the indices that meet this condition
 
 	# Convert to string to test this condition
 	force_str = ''.join(list(map(str, force_zero)))
 
+	n_ind = int(35 / (1000 / frequency))
+	test_str = "(?="+ "1" * n_ind + ")"
 	# Find all occurrences where the pattern occurs
-	true_inds = [m.start() for m in re.finditer('(?=11111111111111111111111111111111111)', force_str)]
+	true_inds = [m.start() for m in re.finditer(test_str, force_str)]
 
 	# true_inds will not include the ends (e.g., 11...11100000) - will not include the final 3 1's
-	extra_inds = [i + 35 for i in true_inds[0:-1]] # So make another array with 35 added on to all but the last value
+	extra_inds = [i + n_ind for i in true_inds[0:-1]] # So make another array with 35 ms added on to all but the last value
 	
 	# Return the 'filtered' rezeroing array
 	filter_plate[true_inds] = 1
@@ -215,10 +219,10 @@ def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
 	# For values at the beginning of the array that should be there but are not counted.
 	# For the values that are 1, make the next 35 values also 1.
 	for i in true_inds:
-		if i > 35:
+		if i > n_ind:
 			break
 		else:
-			filter_plate[i:i+35] = 1
+			filter_plate[i:i+n_ind] = 1
 	
 	# Search string to see if there are any situations where the gap between consecutive 1's is less than 35.
 	# If there is, make all values 1 within this section.
@@ -227,10 +231,13 @@ def rezero_filter(original_fz: np.ndarray, threshold: int = 20):
 		if filter_plate[i] == 1:
 			current_ind = i
 		
-			if current_ind - previous_ind < 35:
+			if current_ind - previous_ind < n_ind:
 				filter_plate[previous_ind:current_ind+1] = 1
 		
 			previous_ind = current_ind
+	
+	# Ensure that any values that are below the threshold are zeroed
+	filter_plate[force_zero_opposite] = 0
 
 	return filter_plate
 
